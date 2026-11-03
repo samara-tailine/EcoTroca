@@ -1,0 +1,1 @@
+export { RegisterUserDto } from '../../auth/dto/register-user.dto.js';
