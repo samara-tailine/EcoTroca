@@ -21,7 +21,7 @@ import { RolesGuard } from './guards/roles.guard.js';
       useFactory: (config: ConfigService) => {
         const secret = config.getOrThrow<string>('JWT_SECRET');
         if (secret.length < 32) {
-          throw new Error('JWT_SECRET must contain at least 32 characters.');
+          throw new Error('JWT_SECRET deve conter pelo menos 32 caracteres.');
         }
 
         return {

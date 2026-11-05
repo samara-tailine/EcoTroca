@@ -19,7 +19,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   ) {
     const secret = config.getOrThrow<string>('JWT_SECRET');
     if (secret.length < 32) {
-      throw new Error('JWT_SECRET must contain at least 32 characters.');
+      throw new Error('JWT_SECRET deve conter pelo menos 32 caracteres.');
     }
 
     super({
@@ -44,7 +44,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
 
     if (!user?.isActive) {
-      throw new UnauthorizedException('Invalid or inactive account.');
+      throw new UnauthorizedException('Conta inválida ou inativa.');
     }
 
     return {

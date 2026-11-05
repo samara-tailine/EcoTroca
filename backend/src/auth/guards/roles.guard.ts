@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../decorators/roles.decorator.js';
 import { AuthenticatedUser } from '../auth.types.js';
@@ -21,8 +21,9 @@ export class RolesGuard implements CanActivate {
       .switchToHttp()
       .getRequest<{ user?: AuthenticatedUser }>();
 
-    return (
-      request.user?.roles.some((role) => requiredRoles.includes(role)) ?? false
-    );
+    // A lista é explícita: ADMIN não herda LIBRARY nem XEROX.
+    const allowed = request.user?.roles.some((role) => requiredRoles.includes(role)) ?? false;
+    if (!allowed) throw new ForbiddenException('Seu perfil não possui permissão para esta operação.');
+    return true;
   }
 }

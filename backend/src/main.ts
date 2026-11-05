@@ -20,7 +20,7 @@ async function bootstrap() {
   if (process.env.SWAGGER_ENABLED === 'true') {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('EcoTroca API')
-      .setDescription('Initial API documentation for EcoTroca.')
+      .setDescription('Documentação da API do EcoTroca.')
       .setVersion('0.1.0')
       .build();
 

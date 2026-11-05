@@ -42,7 +42,7 @@ export class CategoriesService {
   async findOne(id: string) {
     const category = await this.prisma.category.findUnique({ where: { id } });
     if (!category) {
-      throw new NotFoundException('Category not found.');
+      throw new NotFoundException('Categoria não encontrada.');
     }
     return category;
   }
@@ -58,7 +58,7 @@ export class CategoriesService {
       data.description = this.normalizeDescription(dto.description);
     }
     if (Object.keys(data).length === 0) {
-      throw new BadRequestException('Provide at least one field to update.');
+      throw new BadRequestException('Informe ao menos um campo para atualizar.');
     }
 
     try {
@@ -88,7 +88,7 @@ export class CategoriesService {
       select: { id: true },
     });
     if (existing) {
-      throw new ConflictException('Category name is already in use.');
+      throw new ConflictException('Já existe uma categoria com esse nome.');
     }
   }
 
@@ -100,10 +100,10 @@ export class CategoriesService {
   private handlePrismaError(error: unknown): never {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2002') {
-        throw new ConflictException('Category name is already in use.');
+        throw new ConflictException('Já existe uma categoria com esse nome.');
       }
       if (error.code === 'P2025') {
-        throw new NotFoundException('Category not found.');
+        throw new NotFoundException('Categoria não encontrada.');
       }
     }
     throw error;

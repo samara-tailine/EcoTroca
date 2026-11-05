@@ -33,7 +33,7 @@ export class AuthService {
     });
 
     if (!user?.isActive || !user.passwordHash) {
-      throw new UnauthorizedException('Invalid email or password.');
+      throw new UnauthorizedException('E-mail ou senha inválidos.');
     }
 
     let passwordMatches = false;
@@ -44,12 +44,12 @@ export class AuthService {
     }
 
     if (!passwordMatches) {
-      throw new UnauthorizedException('Invalid email or password.');
+      throw new UnauthorizedException('E-mail ou senha inválidos.');
     }
 
     const secret = this.config.getOrThrow<string>('JWT_SECRET');
     if (secret.length < 32) {
-      throw new Error('JWT_SECRET must contain at least 32 characters.');
+      throw new Error('JWT_SECRET deve conter pelo menos 32 caracteres.');
     }
 
     const expiresIn = 3600;

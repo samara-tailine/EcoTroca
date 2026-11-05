@@ -77,7 +77,7 @@ export class UsersService implements OnModuleInit {
 
     if (profiles.length !== new Set(accessProfileKeys).size) {
       throw new BadRequestException(
-        'One or more access profiles are unknown or inactive.',
+        'Um ou mais perfis de acesso não existem ou estão inativos.',
       );
     }
 
@@ -138,7 +138,7 @@ export class UsersService implements OnModuleInit {
     }
 
     if (Object.keys(data).length === 0) {
-      throw new BadRequestException('Provide at least one field to update.');
+      throw new BadRequestException('Informe ao menos um campo para atualizar.');
     }
 
     try {
@@ -189,7 +189,7 @@ export class UsersService implements OnModuleInit {
       });
 
       if (!user) {
-        throw new NotFoundException('User not found.');
+        throw new NotFoundException('Usuário não encontrado.');
       }
 
       const profiles = await transaction.accessProfile.findMany({
@@ -202,7 +202,7 @@ export class UsersService implements OnModuleInit {
 
       if (profiles.length !== new Set(accessProfileKeys).size) {
         throw new BadRequestException(
-          'One or more access profiles are unknown or inactive.',
+          'Um ou mais perfis de acesso não existem ou estão inativos.',
         );
       }
 
@@ -226,7 +226,7 @@ export class UsersService implements OnModuleInit {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found.');
+      throw new NotFoundException('Usuário não encontrado.');
     }
 
     return user;
@@ -258,14 +258,14 @@ export class UsersService implements OnModuleInit {
         const message = fields.some((field) =>
           String(field).toLowerCase().includes('email'),
         )
-          ? 'Email is already registered.'
-          : 'Email or student identifier is already in use.';
+          ? 'O e-mail já está cadastrado.'
+          : 'O e-mail ou a identificação do estudante já está em uso.';
 
         throw new ConflictException(message);
       }
 
       if (error.code === 'P2025') {
-        throw new NotFoundException('User not found.');
+        throw new NotFoundException('Usuário não encontrado.');
       }
     }
 
