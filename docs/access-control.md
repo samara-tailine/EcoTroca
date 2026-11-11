@@ -1,29 +1,39 @@
 # Perfis e permissões do EcoTroca
 
-## Identificadores preservados e responsabilidades
+## Regras definitivas
 
-| Chave interna | Nome exibido (pt-BR) | Responsabilidade definitiva |
+| Chave preservada | Nome exibido | Responsabilidade |
 | --- | --- | --- |
-| STUDENT | Estudante | Solicitar descartes, acompanhar suas solicitações e utilizar seus EcoCoins. |
-| LIBRARY | Administrador da Biblioteca | Receber e conferir equipamentos, aprovar descartes e conceder EcoCoins aos estudantes. |
-| XEROX | Administrador da Xerox | Receber EcoCoins em resgates, debitando o saldo do estudante. |
-| ADMIN | Administrador técnico | Manutenção técnica do sistema, sem herdar permissões operacionais de outros perfis. |
+| STUDENT | Estudante | Solicitar descartes, acompanhar suas solicitações e utilizar EcoCoins. |
+| LIBRARY | Administrador da Biblioteca | Receber e conferir equipamentos, aprovar descartes e conceder EcoCoins. |
+| XEROX | Administrador da Xerox | Receber EcoCoins em resgates e debitar o saldo do estudante. |
+| ADMIN | Administrador técnico | Manutenção técnica; somente este perfil gerencia categorias e equipamentos. |
 
-Os fluxos de descarte e EcoCoins ainda não foram implementados. Essas responsabilidades não criam rotas operacionais nesta etapa. Os guards exigem os perfis explicitamente declarados em cada rota; ADMIN não é um superusuário implícito.
+O fluxo de solicitações de descarte está implementado conforme docs/disposals.md. Carteiras e créditos na aprovação estão implementados conforme docs/ecocoins.md. Resgates e débitos transacionais da Xerox estão implementados conforme docs/redemptions.md.
+
+ADMIN não pode coexistir com LIBRARY nem XEROX na mesma conta, mesmo se uma dessas associações estiver inativa. A API valida a regra no cadastro administrativo e na substituição de perfis. A substituição usa transação e bloqueio da conta, sem deixar alterações parciais se ocorrer erro.
+
+No PostgreSQL, um trigger também protege inserções e atualizações em UserAccessProfile contra combinações proibidas. As atribuições à mesma conta são serializadas para prevenir conflitos concorrentes. As quatro chaves centrais de AccessProfile são protegidas contra renomeação; nomes e descrições seguem separados dos identificadores internos.
+
+LIBRARY e XEROX continuam distintos, sem herança de permissões ou transformação em ADMIN. A regra proíbe a combinação do técnico com qualquer um dos dois operacionais. Ela não acrescenta outras proibições, como STUDENT com ADMIN ou a associação explícita dos dois perfis operacionais; nenhum vínculo existente é removido automaticamente.
 
 ## Rotas existentes
 
-- Cadastro público e login permanecem públicos; cadastro público sempre cria STUDENT. A rota de saúde permanece pública.
-- Gerenciamento de contas e atribuição de perfis continuam restritos a ADMIN, como manutenção técnica.
-- Gerenciamento de categorias/equipamentos e listagens completas permanecem em ADMIN até confirmação de quem administrará operacionalmente o catálogo.
-- Consultas de categorias e equipamentos ativos continuam disponíveis para STUDENT e ADMIN.
-- A consulta de definições de perfis continua disponível a usuários autenticados.
-- LIBRARY e XEROX não recebem acesso ao painel de manutenção nem às operações técnicas por terem nomes de administradores operacionais.
-- Os nomes são exibidos em português na interface, inclusive em sessões antigas. As chaves internas e as associações existentes não são substituídas.
+- Cadastro público e login continuam públicos; o cadastro público sempre cria STUDENT. A saúde da API permanece pública.
+- Gerenciamento de contas e atribuição de perfis exigem ADMIN.
+- Cadastro, edição, ativação/desativação e listagens completas de categorias e equipamentos exigem ADMIN.
+- STUDENT e ADMIN consultam categorias/equipamentos ativos.
+- A consulta de definições de perfis exige autenticação.
+- LIBRARY e XEROX não acessam o painel técnico nem passam a administrar o catálogo.
+- STUDENT cria e acompanha suas solicitações de descarte; LIBRARY elegível recebe, confere e decide. ADMIN e XEROX não executam etapas exclusivas da Biblioteca.
 
-## Oito pesos oficiais fixos
+## Todos os pesos são imutáveis
 
-| Equipamento | Gramas por unidade |
+O peso de cada equipamento é definido uma única vez, na criação por ADMIN. Não pode ser alterado depois por nenhum perfil, mesmo após renomeação, troca de categoria ou mudança de status. A API rejeita o campo de peso na atualização, inclusive se o cliente enviar o valor atual. Os demais dados continuam editáveis pelo administrador técnico.
+
+O trigger Equipment_weight_immutable no PostgreSQL bloqueia qualquer UPDATE que efetivamente altere averageWeightGrams, para todos os equipamentos. Um UPDATE que apenas repete o valor atual não altera o peso e é permitido no banco. As proteções anteriores dos valores oficiais e sua identidade persistente continuam válidas.
+
+| Equipamento existente | Peso fixo em gramas |
 | --- | ---: |
 | Caixa de som (mini portátil) | 250 |
 | Liquidificador (plástico simples) | 750 |
@@ -33,15 +43,28 @@ Os fluxos de descarte e EcoCoins ainda não foram implementados. Essas responsab
 | Impressora (jato de tinta compacta) | 2000 |
 | Modem / Roteador | 250 |
 | Estabilizador (linha leve) | 1250 |
+| Mouse | 120 |
 
-`Equipment.officialCatalogKey` identifica persistentemente cada item. A API não permite editar essa chave e valida o peso mesmo se houver renomeação ou mudança de categoria. A criação por nome oficial ou alias conhecido também exige o peso correto e registra a identidade oficial. A chave única impede duplicar um item oficial em outra categoria.
+A carga inicial não modifica pesos existentes; caso encontre peso incompatível, interrompe e reverte a transação. Ela não é executada automaticamente.
 
-Uma restrição CHECK no PostgreSQL também exige o peso correspondente à identidade oficial. Nenhum perfil da aplicação, incluindo ADMIN, pode alterar esses oito pesos. A migração mantém IDs, status e vínculos; só identifica/corrige o catálogo e atualiza rótulos e descrições dos perfis. Ela não altera contas, senhas, associações de perfis, descartes, snapshots, carteiras nem movimentações. Se houver correspondências ambíguas em outro ambiente, a migração é revertida, sem eliminar registros.
+## Migração e preservação
 
-O script de carga compartilha as mesmas definições de pesos do backend e não é executado automaticamente. O Mouse permanece fora da tabela oficial, com 120 g no catálogo existente. Os demais pesos continuam sob a regra de manutenção técnica atual.
+A migração 20261111000000_immutable_weights_and_separate_admin cria funções e triggers. Não reescreve pesos, contas, senhas, associações, timestamps ou históricos. O trigger de atribuições usa uma atualização sem mudança de valor na linha da conta para garantir exclusão mútua em concorrência, sem modificar updatedAt ou outros campos.
 
-## Decisões que ainda exigem confirmação
+Antes de aplicar, a migração verifica contas com ADMIN e LIBRARY/XEROX. Se encontrar conflitos em outro ambiente, interrompe integralmente; a resolução deve ser explícita, sem exclusão de usuários ou escolha automática de perfis. A consulta local anterior à aplicação não encontrou contas conflitantes e confirmou os nove pesos acima.
 
-1. O gerenciamento do catálogo ficará com o administrador técnico ou será transferido ao Administrador da Biblioteca? A Biblioteca e a Xerox precisam de consulta ao catálogo fora de seus futuros fluxos?
-2. Os pesos de equipamentos não oficiais, como Mouse, devem continuar editáveis pelo administrador técnico ou também deverão ser fixos?
-3. Uma mesma conta poderá acumular perfis técnicos e operacionais? O modelo atual permite múltiplos perfis; nenhuma associação existente foi removida.
+Não há decisões pendentes sobre gerenciamento do catálogo, imutabilidade de pesos ou separação do perfil técnico: essas regras foram confirmadas e implementadas.
+
+## Conferência e impedimento pessoal
+
+A Biblioteca pode registrar divergências por item na rota de conferência existente, preservando a declaração original. Nenhum usuário pode aprovar a própria solicitação, mesmo que possua os perfis Estudante e Administrador da Biblioteca. Rejeições antes do recebimento permanecem permitidas com justificativa obrigatória. Consulte docs/disposals.md para o formato dos dados.
+
+
+## Carteiras e créditos
+
+STUDENT consulta apenas sua carteira e movimentações. LIBRARY elegível consulta apenas créditos de descartes em que participou do recebimento, conferência ou aprovação, sem acesso ao saldo total do estudante. O crédito é automático e transacional na aprovação, a 10 EcoCoins/kg, com histórico e responsável. Não há endpoint manual de concessão. ADMIN e XEROX não podem conceder esses créditos. Cada EcoCoin tem referência histórica de R$ 0,10; resgates na Xerox estão implementados conforme docs/redemptions.md.
+
+
+## Resgates
+
+Somente XEROX ativo, sem perfis ADMIN ou LIBRARY ativos, registra resgates. O destinatário deve ser estudante ativo e ter saldo suficiente. STUDENT consulta apenas seus resgates pelo histórico próprio. Não há acesso genérico à carteira de terceiros, estornos ou ajustes manuais. Repetições usam a mesma chave UUID para impedir débito duplicado.

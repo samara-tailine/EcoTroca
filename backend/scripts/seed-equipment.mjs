@@ -53,6 +53,9 @@ try {
       }
       const categoryId = categories.get(item.category);
       const existing = matches[0];
+      if (existing && existing.averageWeightGrams !== item.weight) {
+        throw new Error(`Peso existente incompatível: ${item.name}. Todos os pesos são imutáveis; a carga foi revertida.`);
+      }
       if (!existing) {
         await tx.equipment.create({
           data: {
@@ -63,10 +66,10 @@ try {
           },
         });
         created++;
-      } else if (existing.averageWeightGrams !== item.weight || existing.categoryId !== categoryId || existing.officialCatalogKey !== item.key) {
+      } else if (existing.categoryId !== categoryId || existing.officialCatalogKey !== item.key) {
         await tx.equipment.update({
           where: { id: existing.id },
-          data: { categoryId, averageWeightGrams: item.weight, officialCatalogKey: item.key },
+          data: { categoryId, officialCatalogKey: item.key },
         });
         updated++;
       } else {
@@ -80,12 +83,13 @@ try {
   }, { isolationLevel: 'Serializable', timeout: 30000 });
 
   process.stdout.write(`Catálogo carregado: ${result.created} criados, ${result.updated} atualizados, ${result.unchanged} já configurados.\n`);
-  process.stdout.write('Mouse e históricos preservados. Os oito pesos oficiais são fixos para todos os perfis.\n');
+  process.stdout.write('Mouse e históricos preservados. Todos os pesos são fixos para todos os perfis, inclusive o Mouse.\n');
 } catch (error) {
   // Não imprime exceções do driver, que podem conter detalhes da conexão.
   const message = error instanceof Error && (
     error.message.startsWith('Categoria ambígua:') ||
     error.message.startsWith('Equipamento ambíguo:') ||
+    error.message.startsWith('Peso existente incompatível:') ||
     error.message === 'DATABASE_URL não está configurada.'
   ) ? error.message : 'Falha na carga. Verifique a conexão local, o cliente Prisma compilado e possíveis operações concorrentes antes de repetir.';
   process.stderr.write(`${message}\n`);

@@ -1,3 +1,4 @@
+import { canUseLibrary } from "../auth/libraryPermission";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import axios from "axios";
@@ -34,7 +35,11 @@ export function LoginPage() {
         to={
           session.user.accessProfiles.some(({ key }) => key === "ADMIN")
             ? "/admin/categories"
-            : "/"
+            : session.user.accessProfiles.some(({ key }) => key === "STUDENT")
+              ? "/student"
+              : canUseLibrary(session.user.accessProfiles.map(({ key }) => key))
+                ? "/library/disposals"
+                : "/"
         }
         replace
       />

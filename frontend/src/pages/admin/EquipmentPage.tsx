@@ -31,7 +31,7 @@ export function EquipmentPage() {
   const formRef = useRef<HTMLFormElement>(null);
   const busy =
     saving || pendingId !== null || list.loading || categories.loading;
-  const weightIsFixed = Boolean(editing?.officialCatalogKey);
+  const weightIsFixed = editing !== null;
   const activeCategories = categories.items
     .filter(({ isActive }) => isActive)
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
@@ -81,7 +81,6 @@ export function EquipmentPage() {
       const data = {
         name: name.trim(),
         description: description.trim() || null,
-        ...(!weightIsFixed ? { averageWeightGrams } : {}),
       };
       const equipment = editing
         ? await equipmentApi.update(editing.id, {
@@ -146,7 +145,7 @@ export function EquipmentPage() {
         <div>
           <p className="eyebrow">CADA EQUIPAMENTO, UM NOVO CICLO</p>
           <h1>Equipamentos</h1>
-          <p>Mantenha o catálogo e consulte os pesos oficiais por unidade.</p>
+          <p>Mantenha o catálogo e consulte os pesos fixos por unidade.</p>
         </div>
         <button
           className="primary-button"
@@ -257,8 +256,8 @@ export function EquipmentPage() {
                 />
                 <p id="weight-help" className="field-help">
                   {weightIsFixed
-                    ? "Peso oficial fixo. Nenhum perfil pode alterar este valor."
-                    : "Informe o peso em gramas, sem casas decimais. Pesos oficiais são validados pelo sistema."}
+                    ? "Peso fixo. Nenhum perfil pode alterar este valor."
+                    : "Defina o peso em gramas no cadastro. Após salvar, ele será fixo para todos os perfis."}
                 </p>
               </div>
             </div>
@@ -354,7 +353,7 @@ export function EquipmentPage() {
                     <tr>
                       <th scope="col">Equipamento</th>
                       <th scope="col">Categoria</th>
-                      <th scope="col">Peso / unidade</th>
+                      <th scope="col">Peso fixo / unidade</th>
                       <th scope="col">Status</th>
                       <th scope="col" className="text-right">
                         Ações
@@ -433,8 +432,9 @@ export function EquipmentPage() {
         )}
       </section>
       <p className="catalog-help">
-        Os oito pesos oficiais são fixos para todos os perfis. Alterações no
-        catálogo preservam os pesos já registrados nos históricos de descarte.
+        Todos os pesos são fixos para todos os perfis, inclusive os não
+        oficiais. Alterações no catálogo preservam os pesos já registrados nos
+        históricos de descarte.
       </p>
     </div>
   );

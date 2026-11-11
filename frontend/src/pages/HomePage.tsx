@@ -1,3 +1,4 @@
+import { canUseLibrary } from "../auth/libraryPermission";
 import { profileLabel } from "../auth/profileLabels";
 import { Link } from "react-router";
 import { useAuth } from "../auth/AuthContext";
@@ -62,6 +63,19 @@ export function HomePage() {
             className="primary-button mt-6 w-fit px-6"
           >
             Abrir manutenção
+          </Link>
+        )}
+        {user.accessProfiles.some(({ key }) => key === "STUDENT") && (
+          <Link to="/student" className="primary-button mt-6 w-fit px-6">
+            Abrir meu painel
+          </Link>
+        )}
+        {canUseLibrary(user.accessProfiles.map(({ key }) => key)) && (
+          <Link
+            to="/library/disposals"
+            className="primary-button mt-6 w-fit px-6"
+          >
+            Abrir painel da Biblioteca
           </Link>
         )}
         <p className="home-note">Pequenas trocas. Novos começos.</p>

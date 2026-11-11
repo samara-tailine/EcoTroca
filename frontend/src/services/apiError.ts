@@ -9,6 +9,7 @@ export function apiError(error: unknown): string {
   if (
     typeof message === "string" &&
     (message.startsWith("O peso oficial") ||
+      message.startsWith("O peso do equipamento") ||
       message.startsWith("Um equipamento oficial"))
   )
     return message;

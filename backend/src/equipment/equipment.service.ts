@@ -66,6 +66,9 @@ export class EquipmentService {
       return await this.prisma.$transaction(async (tx) => {
         const existing = await tx.equipment.findUnique({ where: { id } });
         if (!existing) throw new NotFoundException('Equipamento não encontrado.');
+        if (dto.averageWeightGrams !== undefined) {
+          throw new ForbiddenException('O peso do equipamento é fixo e não pode ser alterado por nenhum perfil.');
+        }
         const byName = findOfficialEquipment(dto.name ?? existing.name);
         const official = existing.officialCatalogKey
           ? OFFICIAL_EQUIPMENT.find(({ key }) => key === existing.officialCatalogKey)
@@ -83,7 +86,7 @@ export class EquipmentService {
         }
         if (dto.name !== undefined) data.name = dto.name.trim();
         if (dto.description !== undefined) data.description = this.normalizeDescription(dto.description);
-        if (dto.averageWeightGrams !== undefined) data.averageWeightGrams = dto.averageWeightGrams;
+
         if (official && !existing.officialCatalogKey) data.officialCatalogKey = official.key;
         return tx.equipment.update({ where: { id }, data, include: EQUIPMENT_INCLUDE });
       }, { isolationLevel: 'Serializable' });
@@ -109,7 +112,7 @@ export class EquipmentService {
       if (error.code === 'P2002') throw new ConflictException('Já existe um equipamento com esse nome na categoria ou com essa identidade oficial.');
       if (error.code === 'P2025') throw new NotFoundException('Equipamento não encontrado.');
       if (error.code === 'P2003') throw new BadRequestException('A categoria não existe.');
-      if (error.code === 'P2034' || error.code === 'P2004') throw new ConflictException('O catálogo foi alterado ou o peso oficial está protegido. Atualize a lista e tente novamente.');
+      if (error.code === 'P2034' || error.code === 'P2004') throw new ConflictException('O catálogo foi alterado ou o peso está protegido. Atualize a lista e tente novamente.');
     }
     throw error;
   }

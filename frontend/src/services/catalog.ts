@@ -48,7 +48,6 @@ export const equipmentApi = {
     id: string,
     data: Omit<EquipmentInput, "categoryId" | "averageWeightGrams"> & {
       categoryId?: string;
-      averageWeightGrams?: number;
     },
   ) => (await api.patch<Equipment>(`/equipment/${id}`, data)).data,
   setStatus: async (id: string, isActive: boolean) =>
