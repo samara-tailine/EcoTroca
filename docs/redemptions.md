@@ -1,5 +1,7 @@
 # Resgates de EcoCoins na Xerox
 
+> Documentação histórica. O POST descrito abaixo foi desativado. Consulte [pagamentos iniciados pelo estudante](student-payments.md) para o fluxo atual. Os comprovantes anteriores continuam preservados.
+
 ## Endpoint criado
 
 `POST /api/ecocoins/redemptions`, com JWT de um operador XEROX ativo. ADMIN e LIBRARY são recusados, inclusive em contas que também tenham XEROX ativo. STUDENT sem XEROX também não pode registrar resgates.

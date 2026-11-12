@@ -1,15 +1,18 @@
 import { Transform } from 'class-transformer';
-import { IsString, IsUUID, Matches } from 'class-validator';
+import { Equals, IsString, IsUUID, Matches } from 'class-validator';
 import { ECOCOIN_AMOUNT_PATTERN } from '../ecocoin.constants.js';
 
-export class CreateRedemptionDto {
+export class CreatePaymentDto {
+  @Equals(undefined, {
+    message: 'Não envie studentId: o pagador é sempre o estudante autenticado.',
+  })
+  studentId?: never;
+
   @Transform(({ value }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )
-  @IsUUID(undefined, {
-    message: 'O identificador do estudante deve ser um UUID válido.',
-  })
-  studentId!: string;
+  @IsUUID(undefined, { message: 'Selecione uma Xerox válida.' })
+  recipientId!: string;
 
   @Transform(({ value }) =>
     typeof value === 'number' && Number.isFinite(value)
@@ -18,12 +21,10 @@ export class CreateRedemptionDto {
         ? value.trim()
         : value,
   )
-  @IsString({
-    message: 'Informe a quantidade de EcoCoins com até duas casas decimais.',
-  })
+  @IsString({ message: 'Informe o valor em EcoCoins.' })
   @Matches(ECOCOIN_AMOUNT_PATTERN, {
     message:
-      'A quantidade deve ser positiva, com até 12 dígitos inteiros e duas casas decimais, usando ponto como separador.',
+      'Informe um valor positivo com até duas casas decimais, usando ponto como separador.',
   })
   amount!: string;
 
@@ -31,8 +32,7 @@ export class CreateRedemptionDto {
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )
   @IsUUID(undefined, {
-    message:
-      'Informe uma chave de idempotência UUID válida para identificar este resgate.',
+    message: 'Informe uma chave de idempotência UUID válida.',
   })
   idempotencyKey!: string;
 }

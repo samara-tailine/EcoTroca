@@ -108,6 +108,7 @@ export interface Movement {
     coinsPerKg: string | null;
     coinValueBrl: string | null;
   };
+  payment?: { id: string; valueBrl: string };
   redemption?: {
     idempotencyKey: string;
     valueBrl: string;

@@ -1,3 +1,6 @@
+import { formatPaymentBrl } from "../../utils/payment";
+import { canPay } from "../../auth/paymentPermission";
+import { useAuth } from "../../auth/AuthContext";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { studentApi } from "../../services/student";
@@ -12,10 +15,10 @@ import {
   formatBrl,
   formatCoins,
   formatDate,
-  redeemableBrl,
 } from "../../utils/studentFormat";
 
 export function EcoCoinsPage() {
+  const { session } = useAuth();
   const [page, setPage] = useState(1);
   const load = useCallback(
     async (signal: AbortSignal) => {
@@ -40,7 +43,10 @@ export function EcoCoinsPage() {
         <div>
           <p className="eyebrow">SUAS ESCOLHAS TÊM VALOR</p>
           <h1>Meus EcoCoins</h1>
-          <p>Seu saldo e o histórico de créditos e resgates, em um só lugar.</p>
+          <p>
+            Seu saldo e o histórico de créditos, pagamentos e resgates
+            anteriores.
+          </p>
         </div>
         <button
           className="secondary-button"
@@ -76,13 +82,7 @@ export function EcoCoinsPage() {
                   remote.data.wallet.coinValueBrl,
                 )}
               </strong>
-              <span>
-                Valor resgatável em centavos:{" "}
-                {redeemableBrl(
-                  remote.data.wallet.balance,
-                  remote.data.wallet.coinValueBrl,
-                )}
-              </span>
+
               <span>
                 1 EcoCoin = {formatBrl(remote.data.wallet.coinValueBrl)}
               </span>
@@ -91,16 +91,24 @@ export function EcoCoinsPage() {
           <div className="student-info-strip">
             <span aria-hidden="true">↻</span>
             <p>
-              Os créditos entram após aprovação da Biblioteca. Para usar seu
-              saldo, procure a Xerox: o operador registra o resgate em múltiplos
-              de 0,10 EcoCoin, sem arredondamento.
+              Os créditos entram após aprovação da Biblioteca. Você pode enviar
+              EcoCoins a uma Xerox ativa, com até duas casas decimais, após
+              revisar e confirmar o pagamento.
             </p>
           </div>
+          {canPay(session?.user.accessProfiles.map((p) => p.key) ?? []) && (
+            <Link
+              className="primary-button w-fit px-6"
+              to="/student/payments/new"
+            >
+              Enviar EcoCoin
+            </Link>
+          )}
           <section className="catalog-card">
             <div className="student-section-heading">
               <h2>Histórico de movimentações</h2>
               <span className="field-help">
-                Créditos e resgates da sua carteira
+                Créditos, pagamentos e resgates anteriores da sua carteira
               </span>
             </div>
             {remote.data.movements.data.length ? (
@@ -112,8 +120,8 @@ export function EcoCoinsPage() {
               >
                 <table className="catalog-table">
                   <caption className="sr-only">
-                    Créditos e resgates de EcoCoins, responsáveis e saldos
-                    históricos
+                    Créditos, pagamentos e resgates anteriores de EcoCoins,
+                    responsáveis e saldos históricos
                   </caption>
                   <thead>
                     <tr>
@@ -154,8 +162,18 @@ export function EcoCoinsPage() {
                                   .slice(0, 8)
                                   .toUpperCase()}
                               </Link>
+                            ) : movement.payment || movement.redemption ? (
+                              <Link
+                                className="text-action"
+                                to={
+                                  "/student/payments/" +
+                                  (movement.payment?.id ?? movement.id)
+                                }
+                              >
+                                Consultar comprovante
+                              </Link>
                             ) : (
-                              `Comprovante #${movement.id.slice(0, 8).toUpperCase()}`
+                              "Movimentação anterior"
                             )}
                           </span>
                           {movement.description && (
@@ -171,9 +189,11 @@ export function EcoCoinsPage() {
                           {formatCoins(movement.amount)}
                         </td>
                         <td>
-                          {movement.redemption
-                            ? formatBrl(movement.redemption.valueBrl)
-                            : "—"}
+                          {movement.payment
+                            ? formatPaymentBrl(movement.payment.valueBrl)
+                            : movement.redemption
+                              ? formatBrl(movement.redemption.valueBrl)
+                              : "—"}
                         </td>
                         <td className="weight-cell">
                           {formatCoins(movement.balanceAfter)}
@@ -186,7 +206,7 @@ export function EcoCoinsPage() {
               </div>
             ) : (
               <p className="catalog-empty">
-                Você ainda não tem créditos ou resgates registrados.
+                Você ainda não tem movimentações registradas.
               </p>
             )}
             <Pagination

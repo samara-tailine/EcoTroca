@@ -1,3 +1,4 @@
+import { canUseXerox } from "../auth/xeroxPermission";
 import { canUseLibrary } from "../auth/libraryPermission";
 import { profileLabel } from "../auth/profileLabels";
 import { Link } from "react-router";
@@ -76,6 +77,11 @@ export function HomePage() {
             className="primary-button mt-6 w-fit px-6"
           >
             Abrir painel da Biblioteca
+          </Link>
+        )}
+        {canUseXerox(user.accessProfiles.map(({ key }) => key)) && (
+          <Link to="/xerox/payments" className="primary-button mt-6 w-fit px-6">
+            Abrir painel da Xerox
           </Link>
         )}
         <p className="home-note">Pequenas trocas. Novos começos.</p>

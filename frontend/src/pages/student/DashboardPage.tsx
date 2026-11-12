@@ -1,3 +1,4 @@
+import { canPay } from "../../auth/paymentPermission";
 import { Link } from "react-router";
 import { useAuth } from "../../auth/AuthContext";
 import { studentApi } from "../../services/student";
@@ -11,7 +12,6 @@ import {
   equivalentBrl,
   formatBrl,
   formatCoins,
-  redeemableBrl,
 } from "../../utils/studentFormat";
 
 export function DashboardPage() {
@@ -26,9 +26,11 @@ export function DashboardPage() {
           <h1>Olá, {firstName}.</h1>
           <p>Acompanhe seus descartes e o valor das suas escolhas.</p>
         </div>
-        <Link to="/student/disposals/new" className="primary-button">
-          ＋ Nova solicitação
-        </Link>
+        {canPay(session?.user.accessProfiles.map((p) => p.key) ?? []) && (
+          <Link to="/student/payments/new" className="primary-button">
+            Enviar EcoCoin
+          </Link>
+        )}
       </div>
       {remote.loading && <StudentLoading />}
       {remote.error && (
@@ -58,13 +60,6 @@ export function DashboardPage() {
               </strong>
               <span>
                 1 EcoCoin = {formatBrl(remote.data.wallet.coinValueBrl)}
-              </span>
-              <span>
-                Resgatável:{" "}
-                {redeemableBrl(
-                  remote.data.wallet.balance,
-                  remote.data.wallet.coinValueBrl,
-                )}
               </span>
             </section>
             <section className="student-metric">
@@ -135,9 +130,9 @@ export function DashboardPage() {
             )}
           </section>
           <p className="catalog-help">
-            O equivalente é exibido sem arredondar seu saldo. Descontos na Xerox
-            usam múltiplos de 0,10 EcoCoin, gerando valores exatos em centavos.
-            Os créditos entram somente após a aprovação da Biblioteca.
+            O equivalente em reais é exato, inclusive frações de centavo. Envie
+            valores positivos com até duas casas decimais em EcoCoins. Os
+            créditos entram somente após a aprovação da Biblioteca.
           </p>
         </>
       )}

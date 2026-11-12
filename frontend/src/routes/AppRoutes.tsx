@@ -1,3 +1,8 @@
+import { XeroxRoute } from "./XeroxRoute";
+import { XeroxLayout } from "../layouts/XeroxLayout";
+import { ReceivedPaymentsPage } from "../pages/xerox/ReceivedPaymentsPage";
+import { SendPaymentPage } from "../pages/student/SendPaymentPage";
+import { PaymentReceiptPage } from "../pages/PaymentReceiptPage";
 import { LibraryRoute } from "./LibraryRoute";
 import { LibraryLayout } from "../layouts/LibraryLayout";
 import { LibraryQueuePage } from "../pages/library/LibraryQueuePage";
@@ -33,6 +38,8 @@ export function AppRoutes() {
               <Route path="disposals" element={<DisposalsPage />} />
               <Route path="disposals/:id" element={<DisposalDetailPage />} />
               <Route path="ecocoins" element={<EcoCoinsPage />} />
+              <Route path="payments/new" element={<SendPaymentPage />} />
+              <Route path="payments/:id" element={<PaymentReceiptPage />} />
               <Route path="*" element={<Navigate to="/student" replace />} />
             </Route>
           </Route>
@@ -45,6 +52,21 @@ export function AppRoutes() {
               <Route
                 path="*"
                 element={<Navigate to="/library/disposals" replace />}
+              />
+            </Route>
+          </Route>
+          <Route element={<XeroxRoute />}>
+            <Route path="/xerox" element={<XeroxLayout />}>
+              <Route index element={<Navigate to="payments" replace />} />
+              <Route path="payments" element={<ReceivedPaymentsPage />} />
+              <Route path="payments/:id" element={<PaymentReceiptPage />} />
+              <Route
+                path="redemptions"
+                element={<Navigate to="/xerox/payments" replace />}
+              />
+              <Route
+                path="*"
+                element={<Navigate to="/xerox/payments" replace />}
               />
             </Route>
           </Route>

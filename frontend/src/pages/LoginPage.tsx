@@ -1,3 +1,4 @@
+import { canUseXerox } from "../auth/xeroxPermission";
 import { canUseLibrary } from "../auth/libraryPermission";
 import { useState } from "react";
 import type { FormEvent } from "react";
@@ -39,7 +40,9 @@ export function LoginPage() {
               ? "/student"
               : canUseLibrary(session.user.accessProfiles.map(({ key }) => key))
                 ? "/library/disposals"
-                : "/"
+                : canUseXerox(session.user.accessProfiles.map(({ key }) => key))
+                  ? "/xerox/payments"
+                  : "/"
         }
         replace
       />

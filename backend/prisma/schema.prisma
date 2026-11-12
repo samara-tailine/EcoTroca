@@ -34,6 +34,8 @@ model User {
   updatedAt              DateTime            @updatedAt @db.Timestamptz(6)
   accessProfiles         UserAccessProfile[] @relation("ProfileAssignment")
   assignmentsCreated    UserAccessProfile[] @relation("ProfileAssignmentActor")
+  paymentsSent           EcoCoinPayment[] @relation("PaymentStudent")
+  paymentsReceived       EcoCoinPayment[] @relation("PaymentRecipient")
   wallet                 EcoCoinWallet?
   disposalRequests       DisposalRequest[]   @relation("DisposalRequester")
   reviewedDisposals      DisposalRequest[]   @relation("DisposalReviewer")
@@ -189,6 +191,8 @@ model EcoCoinMovement {
   amount           Decimal               @db.Decimal(14, 2)
   balanceAfter     Decimal               @db.Decimal(14, 2)
   coinValueBrlSnapshot Decimal?           @db.Decimal(6, 2)
+  paymentId            String? @unique @db.Uuid
+  payment              EcoCoinPayment? @relation(fields: [paymentId], references: [id], onDelete: Restrict)
   redemptionKey        String?            @unique @db.Uuid
   redemptionValueBrl   Decimal?           @db.Decimal(14, 2)
   disposalRequestId String?              @unique @db.Uuid
@@ -218,3 +222,22 @@ model SystemSetting {
   @@index([updatedByUserId])
 }
 
+
+model EcoCoinPayment {
+  id             String @id @default(uuid()) @db.Uuid
+  idempotencyKey String @unique @db.Uuid
+  studentId      String @db.Uuid
+  recipientId    String @db.Uuid
+  studentName    String @db.VarChar(160)
+  recipientName  String @db.VarChar(160)
+  amount         Decimal @db.Decimal(14, 2)
+  valueBrl       Decimal @db.Decimal(15, 3)
+  balanceAfter   Decimal @db.Decimal(14, 2)
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  student        User @relation("PaymentStudent", fields: [studentId], references: [id], onDelete: Restrict)
+  recipient      User @relation("PaymentRecipient", fields: [recipientId], references: [id], onDelete: Restrict)
+  movement       EcoCoinMovement?
+
+  @@index([studentId, createdAt])
+  @@index([recipientId, createdAt])
+}

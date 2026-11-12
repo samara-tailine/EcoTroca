@@ -1855,3 +1855,47 @@ button:disabled {
     align-items: stretch;
   }
 }
+
+.xerox-page {
+  display: grid;
+  gap: 24px;
+  max-width: 960px;
+  margin-inline: auto;
+}
+.xerox-form {
+  display: grid;
+  gap: 22px;
+}
+.xerox-preview {
+  display: grid;
+  gap: 8px;
+  padding: 24px;
+  background: var(--green-soft);
+  color: var(--green-ink);
+  border-radius: 16px;
+}
+.xerox-preview strong {
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+  overflow-wrap: anywhere;
+}
+.xerox-preview small {
+  line-height: 1.6;
+}
+.xerox-key {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  margin-top: 12px;
+}
+.xerox-page .catalog-message {
+  overflow-wrap: anywhere;
+}
+.xerox-page .field-group input:disabled {
+  opacity: 1;
+  background: var(--surface-soft);
+}
+@media (max-width: 640px) {
+  .xerox-page .form-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+}

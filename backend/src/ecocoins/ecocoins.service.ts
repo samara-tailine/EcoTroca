@@ -1,4 +1,3 @@
-import { CreateRedemptionDto } from './dto/create-redemption.dto.js';
 import {
   BadRequestException,
   ConflictException,
@@ -10,7 +9,6 @@ import { Prisma } from '../generated/prisma/client.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
-  ECOCOIN_AMOUNT_PATTERN,
   ECOCOINS_PER_KG,
   ECOCOIN_VALUE_BRL,
   MAX_ECOCOIN_BALANCE,
@@ -18,6 +16,7 @@ import {
 import { ListMovementsDto } from './dto/list-movements.dto.js';
 
 const MOVEMENT_INCLUDE = {
+  payment: true,
   wallet: {
     select: { userId: true, user: { select: { id: true, name: true } } },
   },
@@ -40,174 +39,6 @@ type MovementRecord = Prisma.EcoCoinMovementGetPayload<{
 export class EcocoinsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async redeem(actor: AuthenticatedUser, dto: CreateRedemptionDto) {
-    this.requireXerox(actor);
-    if (
-      typeof dto.amount !== 'string' ||
-      !ECOCOIN_AMOUNT_PATTERN.test(dto.amount)
-    ) {
-      throw new BadRequestException(
-        'Informe uma quantidade válida de EcoCoins com até duas casas decimais.',
-      );
-    }
-    const amount = new Prisma.Decimal(dto.amount);
-    if (!amount.isPositive() || amount.greaterThan(MAX_ECOCOIN_BALANCE)) {
-      throw new BadRequestException(
-        'A quantidade de EcoCoins deve ser maior que zero e respeitar o limite da carteira.',
-      );
-    }
-    const valueBrl = amount.mul(ECOCOIN_VALUE_BRL);
-    if (!valueBrl.isPositive() || valueBrl.decimalPlaces() > 2) {
-      throw new BadRequestException(
-        'Utilize múltiplos de 0,10 EcoCoin para obter descontos exatos em centavos, sem arredondamento.',
-      );
-    }
-    const key = dto.idempotencyKey.toLowerCase();
-    const studentId = dto.studentId.toLowerCase();
-    try {
-      return await this.prisma.$transaction(async (tx) => {
-        // Serializa a operação lógica antes de consultar a chave, inclusive para carteiras diferentes.
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))::text AS "lock"`;
-        const previous = await tx.ecoCoinMovement.findUnique({
-          where: { redemptionKey: key },
-          include: MOVEMENT_INCLUDE,
-        });
-        if (previous) {
-          if (
-            previous.type !== 'DEBIT' ||
-            previous.createdByUserId !== actor.id ||
-            previous.wallet.userId !== studentId ||
-            !previous.amount.equals(amount)
-          ) {
-            throw new ConflictException(
-              'Esta chave de idempotência já foi utilizada com outros dados ou por outro operador.',
-            );
-          }
-          return this.toRedemptionResponse(previous);
-        }
-
-        // Preserva a verificação de atividade enquanto alterações de contas/perfis aguardam.
-        const users = [...new Set([actor.id, studentId])].sort();
-        await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" IN (${Prisma.join(users.map((id) => Prisma.sql`${id}::uuid`))}) ORDER BY "id" FOR SHARE`;
-        const operator = await tx.user.findUnique({
-          where: { id: actor.id },
-          select: {
-            isActive: true,
-            accessProfiles: {
-              where: { accessProfile: { isActive: true } },
-              select: { accessProfile: { select: { key: true } } },
-            },
-          },
-        });
-        const operatorRoles =
-          operator?.accessProfiles.map(
-            ({ accessProfile }) => accessProfile.key,
-          ) ?? [];
-        if (
-          !operator?.isActive ||
-          !operatorRoles.includes('XEROX') ||
-          operatorRoles.includes('ADMIN') ||
-          operatorRoles.includes('LIBRARY')
-        ) {
-          throw new ForbiddenException(
-            'Somente um operador ativo da Xerox pode registrar resgates, sem perfis técnico ou da Biblioteca.',
-          );
-        }
-        const student = await tx.user.findUnique({
-          where: { id: studentId },
-          select: {
-            id: true,
-            isActive: true,
-            accessProfiles: {
-              where: { accessProfile: { key: 'STUDENT', isActive: true } },
-              select: { accessProfileId: true },
-            },
-          },
-        });
-        if (!student) throw new NotFoundException('Estudante não encontrado.');
-        if (!student.isActive)
-          throw new BadRequestException(
-            'Estudantes inativos não podem realizar resgates.',
-          );
-        if (!student.accessProfiles.length)
-          throw new BadRequestException(
-            'A conta informada não possui um perfil de Estudante ativo.',
-          );
-        const wallets = await tx.$queryRaw<
-          { id: string; balance: Prisma.Decimal }[]
-        >`
-          SELECT "id", "balance" FROM "EcoCoinWallet" WHERE "userId" = ${studentId}::uuid FOR UPDATE
-        `;
-        const wallet = wallets[0];
-        if (!wallet)
-          throw new NotFoundException(
-            'Carteira de EcoCoins do estudante não encontrada.',
-          );
-        const balance = new Prisma.Decimal(wallet.balance);
-        if (balance.lessThan(amount))
-          throw new ConflictException(
-            'Saldo insuficiente para realizar este resgate.',
-          );
-        const updated = await tx.ecoCoinWallet.updateMany({
-          where: { id: wallet.id, balance: { gte: amount } },
-          data: { balance: { decrement: amount } },
-        });
-        if (updated.count !== 1)
-          throw new ConflictException(
-            'Saldo insuficiente ou alterado por outra operação. Repita usando a mesma chave de idempotência.',
-          );
-        const movement = await tx.ecoCoinMovement.create({
-          data: {
-            walletId: wallet.id,
-            type: 'DEBIT',
-            amount,
-            balanceAfter: balance.minus(amount),
-            createdByUserId: actor.id,
-            coinValueBrlSnapshot: ECOCOIN_VALUE_BRL,
-            redemptionKey: key,
-            redemptionValueBrl: valueBrl,
-            description: 'Resgate de EcoCoins para desconto na Xerox.',
-            createdAt: new Date(),
-          },
-          include: MOVEMENT_INCLUDE,
-        });
-        return this.toRedemptionResponse(movement);
-      });
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === 'P2002')
-          throw new ConflictException(
-            'Este resgate já foi registrado. Repita usando a mesma chave de idempotência.',
-          );
-        if (error.code === 'P2034' || error.code === 'P2028')
-          throw new ConflictException(
-            'Houve um conflito simultâneo. Repita usando a mesma chave de idempotência.',
-          );
-        if (error.code === 'P2004')
-          throw new BadRequestException(
-            'O resgate não atende às regras de perfil, saldo ou conversão em centavos.',
-          );
-      }
-      throw error;
-    }
-  }
-
-  private toRedemptionResponse(movement: MovementRecord) {
-    if (!movement.redemptionKey || !movement.redemptionValueBrl)
-      throw new ConflictException(
-        'O comprovante do resgate está inconsistente.',
-      );
-    return {
-      id: movement.id,
-      idempotencyKey: movement.redemptionKey,
-      student: movement.wallet.user,
-      operator: movement.createdBy,
-      amount: movement.amount.toFixed(2),
-      valueBrl: movement.redemptionValueBrl.toFixed(2),
-      coinValueBrl: movement.coinValueBrlSnapshot?.toFixed(2),
-      createdAt: movement.createdAt,
-    };
-  }
   async getOwnWallet(actor: AuthenticatedUser) {
     this.requireStudent(actor);
     const wallet = await this.prisma.ecoCoinWallet.findUnique({
@@ -404,16 +235,20 @@ export class EcocoinsService {
       createdAt: movement.createdAt,
       responsible: movement.createdBy,
       origin: {
-        type: movement.redemptionKey
-          ? 'XEROX_REDEMPTION'
-          : movement.disposalRequestId
-            ? 'DISPOSAL_APPROVAL'
-            : 'LEGACY',
-        label: movement.redemptionKey
-          ? 'Resgate na Xerox'
-          : movement.disposalRequestId
-            ? 'Descarte aprovado'
-            : 'Movimentação anterior',
+        type: movement.paymentId
+          ? 'STUDENT_PAYMENT'
+          : movement.redemptionKey
+            ? 'XEROX_REDEMPTION'
+            : movement.disposalRequestId
+              ? 'DISPOSAL_APPROVAL'
+              : 'LEGACY',
+        label: movement.paymentId
+          ? 'Pagamento à Xerox'
+          : movement.redemptionKey
+            ? 'Resgate na Xerox'
+            : movement.disposalRequestId
+              ? 'Descarte aprovado'
+              : 'Movimentação anterior',
         disposalRequestId: movement.disposalRequestId,
         weightGrams: movement.disposalRequest?.totalWeightGramsSnapshot ?? null,
         coinsPerKg:
@@ -422,6 +257,14 @@ export class EcocoinsService {
           ) ?? null,
         coinValueBrl: movement.coinValueBrlSnapshot?.toFixed(2) ?? null,
       },
+      ...(movement.payment
+        ? {
+            payment: {
+              id: movement.payment.id,
+              valueBrl: movement.payment.valueBrl.toFixed(3),
+            },
+          }
+        : {}),
       ...(movement.redemptionKey
         ? {
             redemption: {
@@ -435,18 +278,6 @@ export class EcocoinsService {
         ? { balanceAfter: movement.balanceAfter.toFixed(2) }
         : { student: movement.disposalRequest?.requester ?? null }),
     };
-  }
-
-  private requireXerox(actor: AuthenticatedUser) {
-    if (
-      !actor.roles.includes('XEROX') ||
-      actor.roles.includes('ADMIN') ||
-      actor.roles.includes('LIBRARY')
-    ) {
-      throw new ForbiddenException(
-        'O registro de resgates é exclusivo da Xerox e não está disponível ao administrador técnico ou à Biblioteca.',
-      );
-    }
   }
 
   private requireStudent(actor: AuthenticatedUser) {

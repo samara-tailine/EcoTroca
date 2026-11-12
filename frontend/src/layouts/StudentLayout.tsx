@@ -1,3 +1,4 @@
+import { canPay } from "../auth/paymentPermission";
 import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router";
 import { useAuth } from "../auth/AuthContext";
@@ -7,15 +8,17 @@ export function StudentLayout() {
   const { session, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const { pathname } = useLocation();
-  const pageName = pathname.endsWith("/new")
-    ? "Nova solicitação"
-    : pathname === "/student/disposals"
-      ? "Meus descartes"
-      : pathname.startsWith("/student/disposals/")
-        ? "Detalhes do descarte"
-        : pathname.endsWith("/ecocoins")
-          ? "Meus EcoCoins"
-          : "Visão geral";
+  const pageName = pathname.startsWith("/student/payments")
+    ? "Pagamentos de EcoCoins"
+    : pathname.endsWith("/new")
+      ? "Nova solicitação"
+      : pathname === "/student/disposals"
+        ? "Meus descartes"
+        : pathname.startsWith("/student/disposals/")
+          ? "Detalhes do descarte"
+          : pathname.endsWith("/ecocoins")
+            ? "Meus EcoCoins"
+            : "Visão geral";
   const name = session?.user.name ?? "";
   const initials = name
     .split(" ")
@@ -39,6 +42,17 @@ export function StudentLayout() {
         </Link>
         <nav id="student-navigation" aria-label="Menu do estudante">
           <p className="sidebar-label">MEU ECOTROCA</p>
+          {canPay(session?.user.accessProfiles.map((p) => p.key) ?? []) && (
+            <NavLink
+              to="/student/payments/new"
+              onClick={() => setMenuOpen(false)}
+            >
+              <span className="nav-symbol" aria-hidden="true">
+                ↗
+              </span>
+              Enviar EcoCoin
+            </NavLink>
+          )}
           <NavLink to="/student" end onClick={() => setMenuOpen(false)}>
             <span className="nav-symbol" aria-hidden="true">
               ⌂
@@ -52,7 +66,7 @@ export function StudentLayout() {
             <span className="nav-symbol" aria-hidden="true">
               ＋
             </span>
-            Nova solicitação
+            Solicitar descarte
           </NavLink>
           <NavLink
             to="/student/disposals"
