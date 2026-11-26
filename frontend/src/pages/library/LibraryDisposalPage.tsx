@@ -1,3 +1,4 @@
+import { observedTotals } from "../../utils/observedDisposal";
 import { useCallback, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { useAuth } from "../../auth/AuthContext";
@@ -14,7 +15,11 @@ import {
   DisposalTimeline,
 } from "../../components/disposals/DisposalReadOnly";
 import { LibraryActions } from "../../components/library/LibraryActions";
-import { formatDate, formatGrams } from "../../utils/studentFormat";
+import {
+  formatCoins,
+  formatDate,
+  formatGrams,
+} from "../../utils/studentFormat";
 
 export function LibraryDisposalPage() {
   const { id = "" } = useParams();
@@ -33,6 +38,7 @@ function LibraryDisposalWorkspace({ id }: { id: string }) {
   const [error, setError] = useState("");
   const errorRef = useRef<HTMLDivElement>(null);
   const request = remote.data;
+  const total = request ? observedTotals(request.items) : null;
   function attempt() {
     setSuccess("");
     setError("");
@@ -97,9 +103,25 @@ function LibraryDisposalWorkspace({ id }: { id: string }) {
               <strong>{formatDate(request.requestedAt)}</strong>
             </div>
             <div>
-              <span className="field-help">Peso total histórico</span>
+              <span className="field-help">Peso declarado (preservado)</span>
               <strong>{formatGrams(request.totalWeightGramsSnapshot)}</strong>
             </div>
+            <div>
+              <span className="field-help">Peso conferido</span>
+              <strong>
+                {request.totalWeightGramsObserved === null
+                  ? request.status === "APPROVED"
+                    ? "Aprovação histórica: regra anterior"
+                    : "Conferência pendente"
+                  : formatGrams(request.totalWeightGramsObserved)}
+              </strong>
+            </div>
+            {total && (
+              <div>
+                <span className="field-help">EcoCoins pela conferência</span>
+                <strong>{formatCoins(total.ecoCoins)} EcoCoins</strong>
+              </div>
+            )}
             <button
               type="button"
               className="secondary-button"

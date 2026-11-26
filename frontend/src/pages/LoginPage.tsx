@@ -1,13 +1,18 @@
+import { institutionalEmailError } from "../services/emailPolicy";
+import { GoogleButton } from "../components/GoogleButton";
+import { Icon } from "../components/Icon";
 import { canUseXerox } from "../auth/xeroxPermission";
 import { canUseLibrary } from "../auth/libraryPermission";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import axios from "axios";
-import { Navigate } from "react-router";
+import { Link, Navigate } from "react-router";
 import { useAuth } from "../auth/AuthContext";
 import { Brand } from "../components/Brand";
 
 function loginError(error: unknown): string {
+  const restriction = institutionalEmailError(error);
+  if (restriction) return restriction;
   if (axios.isAxiosError(error)) {
     if (!error.response)
       return "Não foi possível conectar à API. Verifique sua conexão e tente novamente.";
@@ -23,7 +28,8 @@ function loginError(error: unknown): string {
 }
 
 export function LoginPage() {
-  const { session, expired, login } = useAuth();
+  const { session, expired, login, googleLogin } = useAuth();
+  const [googleBusy, setGoogleBusy] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -50,7 +56,7 @@ export function LoginPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (isSubmitting) return;
+    if (isSubmitting || googleBusy) return;
     setError("");
     setIsSubmitting(true);
     try {
@@ -72,57 +78,20 @@ export function LoginPage() {
       </header>
 
       <main className="login-layout">
-        <section className="intro-panel" aria-labelledby="intro-title">
-          <span className="intro-eyebrow">
-            <span className="small-dot" /> CONSUMO CONSCIENTE
-          </span>
-          <h1 id="intro-title">
-            Pequenas trocas.
-            <br />
-            <span>Novos começos.</span>
-          </h1>
-          <p>
-            O que já fez parte da sua história pode fazer parte de um futuro
-            melhor.
-          </p>
-          <div className="cycle-art" aria-hidden="true">
-            <div className="cycle-orbit orbit-outer" />
-            <div className="cycle-orbit orbit-inner" />
-            <span className="orbit-label label-top">reutilizar</span>
-            <span className="orbit-label label-bottom">transformar</span>
-            <svg viewBox="0 0 160 160" fill="none">
-              <path
-                d="M40 63a45 45 0 0 1 77-15l10 14M126 40v23h-23M120 98a45 45 0 0 1-77 15l-10-14M34 121V98h23"
-                stroke="currentColor"
-                strokeWidth="7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M68 84c0-13 9-20 25-20 0 16-6 27-17 27-5 0-8-3-8-7Z"
-                stroke="currentColor"
-                strokeWidth="3"
-              />
-              <path
-                d="m65 96 20-23"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
-          <div className="intro-note">
-            <span>01</span> Mais valor para o que pode continuar.
+        <section
+          className="intro-panel"
+          aria-label="EcoTroca: o fim do seu eletrônico é o começo de um novo ciclo."
+        >
+          <div className="login-brand-large">
+            <Brand />
           </div>
         </section>
 
         <section className="login-form-panel" aria-labelledby="login-title">
           <div className="login-form-content">
             <p className="eyebrow">BEM-VINDO AO ECOTROCA</p>
-            <h2 id="login-title">Entre na sua conta</h2>
-            <p className="form-intro">
-              Conecte-se para fazer parte dessa mudança.
-            </p>
+            <h2 id="login-title">Entrar no EcoTroca</h2>
+            <p className="form-intro">Acesse sua conta para continuar.</p>
 
             {expired && !error && (
               <p className="notice" role="status">
@@ -143,7 +112,10 @@ export function LoginPage() {
               aria-busy={isSubmitting}
             >
               <div className="field-group">
-                <label htmlFor="email">E-mail</label>
+                <label htmlFor="email">
+                  <Icon name="mail" />
+                  E-mail
+                </label>
                 <input
                   id="email"
                   type="email"
@@ -156,11 +128,14 @@ export function LoginPage() {
                   onChange={(event) => setEmail(event.target.value)}
                   required
                   maxLength={320}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || googleBusy}
                 />
               </div>
               <div className="field-group">
-                <label htmlFor="password">Senha</label>
+                <label htmlFor="password">
+                  <Icon name="lock" />
+                  Senha
+                </label>
                 <div className="password-field">
                   <input
                     id="password"
@@ -172,7 +147,7 @@ export function LoginPage() {
                     onChange={(event) => setPassword(event.target.value)}
                     required
                     maxLength={128}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || googleBusy}
                   />
                   <button
                     type="button"
@@ -182,7 +157,7 @@ export function LoginPage() {
                     }
                     aria-pressed={showPassword}
                     onClick={() => setShowPassword(!showPassword)}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || googleBusy}
                   >
                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                       <path
@@ -211,7 +186,7 @@ export function LoginPage() {
               <button
                 className="primary-button"
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || googleBusy}
               >
                 {isSubmitting ? (
                   <>
@@ -224,8 +199,22 @@ export function LoginPage() {
                 )}
               </button>
             </form>
+            <div className="auth-divider">
+              <span>ou</span>
+            </div>
+            <GoogleButton
+              onCredential={googleLogin}
+              disabled={isSubmitting}
+              onBusyChange={setGoogleBusy}
+            />
             <p className="login-hint">
               Use o e-mail e a senha da sua conta EcoTroca.
+            </p>
+            <p className="login-hint">
+              Não tem uma conta?{" "}
+              <Link className="text-action" to="/register">
+                Cadastre-se
+              </Link>
             </p>
           </div>
           <p className="form-footer">

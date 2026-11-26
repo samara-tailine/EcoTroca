@@ -1,3 +1,7 @@
+import { GoogleAuthController } from './google-auth.controller.js';
+import { GoogleAuthService } from './google-auth.service.js';
+import { GoogleTokenService } from './google-token.service.js';
+import { GoogleChallengeService } from './google-challenge.service.js';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
@@ -33,9 +37,12 @@ import { RolesGuard } from './guards/roles.guard.js';
     PrismaModule,
     UsersModule,
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, GoogleAuthController],
   providers: [
     AuthService,
+    GoogleAuthService,
+    GoogleTokenService,
+    GoogleChallengeService,
     JwtStrategy,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },

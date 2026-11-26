@@ -75,7 +75,10 @@ export function DisposalTable({ items }: { items: Disposal[] }) {
               </td>
               <td>{formatDate(item.requestedAt)}</td>
               <td className="weight-cell">
-                {formatGrams(item.totalWeightGramsSnapshot)}
+                {formatGrams(
+                  item.totalWeightGramsObserved ??
+                    item.totalWeightGramsSnapshot,
+                )}
               </td>
               <td>
                 <DisposalBadge status={item.status} label={item.statusLabel} />

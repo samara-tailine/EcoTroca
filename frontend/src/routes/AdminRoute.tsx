@@ -3,7 +3,29 @@ import { useAuth } from "../auth/AuthContext";
 import { Brand } from "../components/Brand";
 
 export function AdminRoute() {
-  const { session, logout } = useAuth();
+  const { session, logout, permissionsError, refreshPermissions } = useAuth();
+  if (
+    permissionsError &&
+    session?.user.accessProfiles.some((p) => p.key === "ADMIN")
+  )
+    return (
+      <main className="home-content">
+        <p role="alert">
+          {permissionsError} Confirme sua conexão para continuar na
+          administração.
+        </p>
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={() => void refreshPermissions()}
+        >
+          Verificar novamente
+        </button>
+        <button type="button" className="secondary-button" onClick={logout}>
+          Sair
+        </button>
+      </main>
+    );
   if (session?.user.accessProfiles.some(({ key }) => key === "ADMIN"))
     return <Outlet />;
 

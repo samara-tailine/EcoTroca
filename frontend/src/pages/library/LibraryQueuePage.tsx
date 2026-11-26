@@ -95,7 +95,7 @@ export function LibraryQueuePage() {
                       <th scope="col">Solicitação</th>
                       <th scope="col">Estudante</th>
                       <th scope="col">Enviada em</th>
-                      <th scope="col">Peso histórico</th>
+                      <th scope="col">Pesos declarado / conferido</th>
                       <th scope="col">Status</th>
                       <th scope="col">Detalhes</th>
                     </tr>
@@ -119,6 +119,14 @@ export function LibraryQueuePage() {
                         <td>{formatDate(request.requestedAt)}</td>
                         <td className="weight-cell">
                           {formatGrams(request.totalWeightGramsSnapshot)}
+                          <span className="record-description">
+                            Conferido:{" "}
+                            {request.totalWeightGramsObserved === null
+                              ? request.status === "APPROVED"
+                                ? "Histórico anterior"
+                                : "Pendente"
+                              : formatGrams(request.totalWeightGramsObserved)}
+                          </span>
                         </td>
                         <td>
                           <DisposalBadge

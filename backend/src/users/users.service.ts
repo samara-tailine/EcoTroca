@@ -1,3 +1,4 @@
+import { assertInstitutionalEmail } from '../auth/email-domain.policy.js';
 import { assertCompatibleAccessProfiles } from './access-profile.policy.js';
 import {
   BadRequestException,
@@ -54,10 +55,7 @@ export class UsersService implements OnModuleInit {
   }
 
   async create(dto: CreateUserDto) {
-    return this.createWithProfiles(
-      dto,
-      dto.accessProfileKeys ?? ['STUDENT'],
-    );
+    return this.createWithProfiles(dto, dto.accessProfileKeys ?? ['STUDENT']);
   }
 
   async registerPublic(dto: RegisterUserDto) {
@@ -68,6 +66,7 @@ export class UsersService implements OnModuleInit {
     dto: RegisterUserDto,
     accessProfileKeys: AccessProfileKey[],
   ) {
+    assertInstitutionalEmail(dto.email);
     assertCompatibleAccessProfiles(accessProfileKeys);
     const profiles = await this.prisma.accessProfile.findMany({
       where: {
@@ -130,6 +129,7 @@ export class UsersService implements OnModuleInit {
     }
 
     if (dto.email !== undefined) {
+      assertInstitutionalEmail(dto.email);
       data.email = dto.email.trim().toLowerCase();
     }
 
@@ -140,7 +140,9 @@ export class UsersService implements OnModuleInit {
     }
 
     if (Object.keys(data).length === 0) {
-      throw new BadRequestException('Informe ao menos um campo para atualizar.');
+      throw new BadRequestException(
+        'Informe ao menos um campo para atualizar.',
+      );
     }
 
     try {
@@ -186,26 +188,37 @@ export class UsersService implements OnModuleInit {
   async setAccessProfiles(id: string, accessProfileKeys: AccessProfileKey[]) {
     assertCompatibleAccessProfiles(accessProfileKeys);
     try {
-      await this.prisma.$transaction(async (transaction) => {
-        // Evita que duas substituições de perfis da mesma conta se misturem.
-        const users = await transaction.$queryRaw<{ id: string }[]>`
+      await this.prisma.$transaction(
+        async (transaction) => {
+          // Evita que duas substituições de perfis da mesma conta se misturem.
+          const users = await transaction.$queryRaw<{ id: string }[]>`
           SELECT "id" FROM "User" WHERE "id" = ${id}::uuid FOR UPDATE
         `;
-        if (!users.length) throw new NotFoundException('Usuário não encontrado.');
-        const profiles = await transaction.accessProfile.findMany({
-          where: { key: { in: accessProfileKeys }, isActive: true },
-          select: { id: true, key: true },
-        });
-        if (profiles.length !== new Set(accessProfileKeys).size) {
-          throw new BadRequestException('Um ou mais perfis de acesso não existem ou estão inativos.');
-        }
-        await transaction.userAccessProfile.deleteMany({ where: { userId: id } });
-        if (profiles.length) {
-          await transaction.userAccessProfile.createMany({
-            data: profiles.map((profile) => ({ userId: id, accessProfileId: profile.id })),
+          if (!users.length)
+            throw new NotFoundException('Usuário não encontrado.');
+          const profiles = await transaction.accessProfile.findMany({
+            where: { key: { in: accessProfileKeys }, isActive: true },
+            select: { id: true, key: true },
           });
-        }
-      }, { isolationLevel: 'Serializable' });
+          if (profiles.length !== new Set(accessProfileKeys).size) {
+            throw new BadRequestException(
+              'Um ou mais perfis de acesso não existem ou estão inativos.',
+            );
+          }
+          await transaction.userAccessProfile.deleteMany({
+            where: { userId: id },
+          });
+          if (profiles.length) {
+            await transaction.userAccessProfile.createMany({
+              data: profiles.map((profile) => ({
+                userId: id,
+                accessProfileId: profile.id,
+              })),
+            });
+          }
+        },
+        { isolationLevel: 'Serializable' },
+      );
       return await this.findOne(id);
     } catch (error) {
       this.handlePrismaError(error);
@@ -238,7 +251,9 @@ export class UsersService implements OnModuleInit {
       isActive: user.isActive,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
-      accessProfiles: user.accessProfiles.map(({ accessProfile }) => accessProfile),
+      accessProfiles: user.accessProfiles.map(
+        ({ accessProfile }) => accessProfile,
+      ),
     };
   }
 
@@ -257,10 +272,14 @@ export class UsersService implements OnModuleInit {
       }
 
       if (error.code === 'P2004') {
-        throw new ConflictException('A combinação de perfis técnicos e operacionais não é permitida.');
+        throw new ConflictException(
+          'Combinação de perfis inválida: ADMIN não pode acumular LIBRARY ou XEROX, e LIBRARY não pode acumular XEROX.',
+        );
       }
       if (error.code === 'P2034') {
-        throw new ConflictException('Os perfis foram alterados em outra operação. Atualize os dados e tente novamente.');
+        throw new ConflictException(
+          'Os perfis foram alterados em outra operação. Atualize os dados e tente novamente.',
+        );
       }
       if (error.code === 'P2025') {
         throw new NotFoundException('Usuário não encontrado.');

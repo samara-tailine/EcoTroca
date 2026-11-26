@@ -1,3 +1,5 @@
+import { UsersPage } from "../pages/admin/UsersPage";
+import { RegisterPage } from "../pages/RegisterPage";
 import { XeroxRoute } from "./XeroxRoute";
 import { XeroxLayout } from "../layouts/XeroxLayout";
 import { ReceivedPaymentsPage } from "../pages/xerox/ReceivedPaymentsPage";
@@ -29,6 +31,7 @@ export function AppRoutes() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<HomePage />} />
           <Route element={<StudentRoute />}>
@@ -75,6 +78,7 @@ export function AppRoutes() {
               <Route index element={<Navigate to="categories" replace />} />
               <Route path="categories" element={<CategoriesPage />} />
               <Route path="equipment" element={<EquipmentPage />} />
+              <Route path="users" element={<UsersPage />} />
               <Route
                 path="*"
                 element={<Navigate to="/admin/categories" replace />}

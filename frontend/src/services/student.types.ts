@@ -30,6 +30,7 @@ export interface DisposalItem {
   equipmentId: string;
   equipmentNameSnapshot: string | null;
   quantity: number;
+  quantityObserved: number | null;
   averageWeightGramsSnapshot: number;
   physicalCondition: string | null;
   functionality: string | null;
@@ -60,6 +61,7 @@ export interface Disposal {
   checkedAt: string | null;
   approvedAt: string | null;
   totalWeightGramsSnapshot: number | null;
+  totalWeightGramsObserved: number | null;
   reviewNotes: string | null;
   reviewedBy: { id: string; name: string } | null;
   items: DisposalItem[];

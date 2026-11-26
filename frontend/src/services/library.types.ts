@@ -13,6 +13,7 @@ export interface DivergenceInput {
   functionalityObserved?: (typeof FUNCTIONALITIES)[number];
 }
 export interface CheckInput {
+  items: { itemId: string; quantityObserved: number }[];
   notes?: string;
   divergences?: DivergenceInput[];
 }

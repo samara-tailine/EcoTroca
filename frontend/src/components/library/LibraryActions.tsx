@@ -1,3 +1,4 @@
+import { observedTotals } from "../../utils/observedDisposal";
 import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import axios from "axios";
@@ -14,7 +15,7 @@ import {
 } from "../../services/student.types";
 import type { Disposal } from "../../services/student.types";
 import { studentError } from "../../services/studentError";
-import { formatGrams } from "../../utils/studentFormat";
+import { formatCoins, formatGrams } from "../../utils/studentFormat";
 
 type DivergenceDraft = {
   enabled: boolean;
@@ -48,6 +49,16 @@ export function LibraryActions({
   const lock = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
   const policy = libraryActionPolicy(request, actorId);
+  const draftTotal = observedTotals(
+    request.items.map((item) => {
+      const raw = drafts[item.id]?.quantity.trim() ?? "";
+      return {
+        quantityObserved: /^\d+$/.test(raw) ? Number(raw) : null,
+        averageWeightGramsSnapshot: item.averageWeightGramsSnapshot,
+      };
+    }),
+  );
+  const confirmedTotal = observedTotals(request.items);
   const terminal = ["APPROVED", "REJECTED", "CANCELLED"].includes(
     request.status,
   );
@@ -65,7 +76,7 @@ export function LibraryActions({
           {
             enabled: false,
             description: "",
-            quantity: "",
+            quantity: item.quantityObserved?.toString() ?? "",
             physical: "",
             functionality: "",
           },
@@ -104,13 +115,26 @@ export function LibraryActions({
     const check: CheckInput = {
       ...(notes.trim() ? { notes: notes.trim() } : {}),
       divergences: [],
+      items: [],
     };
     if (action === "check") {
       for (const item of request.items) {
         const draft = drafts[item.id];
-        if (!draft?.enabled) continue;
-        const quantity =
-          draft.quantity.trim() === "" ? undefined : Number(draft.quantity);
+        const raw = draft?.quantity.trim() ?? "";
+        const quantity = /^\d+$/.test(raw) ? Number(raw) : NaN;
+        if (
+          !Number.isInteger(quantity) ||
+          quantity < 0 ||
+          quantity > 2147483647
+        ) {
+          onError(
+            "Informe uma quantidade conferida inteira e não negativa para cada equipamento, inclusive sem divergência.",
+            false,
+          );
+          return;
+        }
+        check.items.push({ itemId: item.id, quantityObserved: quantity });
+        if (!draft.enabled) continue;
         if (!draft.description.trim()) {
           onError(
             "Descreva cada divergência selecionada antes de concluir a conferência.",
@@ -118,20 +142,10 @@ export function LibraryActions({
           );
           return;
         }
-        if (
-          quantity !== undefined &&
-          (!Number.isInteger(quantity) || quantity < 0 || quantity > 2147483647)
-        ) {
-          onError(
-            "A quantidade observada deve ser um inteiro entre zero e 2.147.483.647.",
-            false,
-          );
-          return;
-        }
         check.divergences!.push({
           itemId: item.id,
           description: draft.description.trim(),
-          ...(quantity !== undefined ? { quantityObserved: quantity } : {}),
+          quantityObserved: quantity,
           ...(draft.physical
             ? { physicalConditionObserved: draft.physical }
             : {}),
@@ -244,6 +258,21 @@ export function LibraryActions({
           aria-busy={pending}
         >
           <h3 id="library-action-form-title">{ACTION_LABELS[action]}</h3>
+          {action === "check" && (
+            <p className="notice" aria-live="polite">
+              {draftTotal ? (
+                <>
+                  Peso conferido: {formatGrams(draftTotal.weightGrams)} ·
+                  Crédito previsto: {formatCoins(draftTotal.ecoCoins)} EcoCoins
+                  (10/kg).
+                  {draftTotal.weightGrams === 0 &&
+                    " Nenhum item entregue: registre a conferência e rejeite a solicitação."}
+                </>
+              ) : (
+                "Informe todas as quantidades para visualizar o peso real e o crédito previsto."
+              )}
+            </p>
+          )}
           <fieldset
             disabled={pending}
             className="student-form-fieldset space-y-5"
@@ -258,6 +287,14 @@ export function LibraryActions({
                     Ao confirmar, a aprovação e o crédito de EcoCoins são
                     registrados juntos pelo sistema. Pesos e conversões não
                     podem ser editados aqui.
+                    {confirmedTotal && (
+                      <>
+                        {" "}
+                        Peso conferido:{" "}
+                        {formatGrams(confirmedTotal.weightGrams)} · Crédito:{" "}
+                        {formatCoins(confirmedTotal.ecoCoins)} EcoCoins.
+                      </>
+                    )}
                   </p>
                 )}
                 <div className="field-group">
@@ -300,9 +337,9 @@ export function LibraryActions({
             {action === "check" && (
               <div className="space-y-4">
                 <p className="library-action-help">
-                  Marque apenas os itens com divergências. Os campos abaixo
-                  registram o que foi observado, sem alterar os dados originais
-                  do estudante ou os pesos.
+                  Informe a quantidade efetivamente conferida de todos os itens,
+                  mesmo sem divergência. Use zero se não houve entrega. Os dados
+                  declarados e pesos fixos serão preservados.
                 </p>
                 {request.items.map((item, index) => {
                   const draft = drafts[item.id];
@@ -312,6 +349,7 @@ export function LibraryActions({
                       <label className="library-checkline">
                         <input
                           type="checkbox"
+                          disabled={Boolean(item.divergence)}
                           checked={draft.enabled}
                           onChange={(event) =>
                             update(item.id, { enabled: event.target.checked })
@@ -331,6 +369,29 @@ export function LibraryActions({
                         {formatGrams(item.averageWeightGramsSnapshot)} por
                         unidade.
                       </p>
+                      <div className="field-group">
+                        <label htmlFor={`observed-quantity-${index}`}>
+                          Quantidade efetivamente conferida *
+                        </label>
+                        <input
+                          id={`observed-quantity-${index}`}
+                          type="number"
+                          required
+                          min={0}
+                          max={2147483647}
+                          step={1}
+                          inputMode="numeric"
+                          value={draft.quantity}
+                          onChange={(event) =>
+                            update(item.id, {
+                              quantity: event.target.value,
+                            })
+                          }
+                        />
+                        <p className="field-help">
+                          Use zero se o item não foi entregue.
+                        </p>
+                      </div>
                       {draft.enabled && (
                         <div className="library-observed-fields">
                           <div className="field-group student-full-field">
@@ -351,29 +412,7 @@ export function LibraryActions({
                               }
                             />
                           </div>
-                          <div className="field-group">
-                            <label htmlFor={`observed-quantity-${index}`}>
-                              Quantidade observada{" "}
-                              <span className="optional-label">(opcional)</span>
-                            </label>
-                            <input
-                              id={`observed-quantity-${index}`}
-                              type="number"
-                              min={0}
-                              max={2147483647}
-                              step={1}
-                              inputMode="numeric"
-                              value={draft.quantity}
-                              onChange={(event) =>
-                                update(item.id, {
-                                  quantity: event.target.value,
-                                })
-                              }
-                            />
-                            <p className="field-help">
-                              Use zero se o item não foi entregue.
-                            </p>
-                          </div>
+
                           <div className="field-group">
                             <label htmlFor={`observed-condition-${index}`}>
                               Condição observada{" "}

@@ -29,10 +29,24 @@ export function DisposalItems({
                   "Equipamento"}
               </h3>
               <span className="profile-badge">
-                {item.quantity.toLocaleString("pt-BR")} unidade(s)
+                {item.quantity.toLocaleString("pt-BR")} unidade(s) declarada(s)
               </span>
             </div>
             <dl className="student-data-grid">
+              <div>
+                <dt>Quantidade efetivamente conferida</dt>
+                <dd>{item.quantityObserved ?? "Não registrada"}</dd>
+              </div>
+              {item.quantityObserved !== null && (
+                <div>
+                  <dt>Peso efetivamente conferido</dt>
+                  <dd>
+                    {formatGrams(
+                      item.quantityObserved * item.averageWeightGramsSnapshot,
+                    )}
+                  </dd>
+                </div>
+              )}
               <div>
                 <dt>Condição física declarada</dt>
                 <dd>{item.physicalCondition || "Não informada"}</dd>

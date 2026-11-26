@@ -1,14 +1,17 @@
 import 'dotenv/config';
+import { assertInstitutionalEmail } from '../dist/auth/email-domain.policy.js';
 import { randomBytes } from 'node:crypto';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as argon2 from 'argon2';
 import { PrismaClient } from '../dist/generated/prisma/client.js';
 
-const email = 'admin@ecotroca.test';
+const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
 try {
+  if (!email) throw new Error('Configure ADMIN_EMAIL com o e-mail institucional do administrador.');
+  assertInstitutionalEmail(email);
   if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL não está configurada.');
   }

@@ -1,3 +1,4 @@
+import { emailDomainConfiguration } from './auth/email-domain.policy.js';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -8,6 +9,7 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.enableCors({
+    credentials: true,
     origin: process.env.FRONTEND_ORIGIN ?? 'http://localhost:5173',
   });
   app.useGlobalPipes(
@@ -31,7 +33,11 @@ async function bootstrap() {
     );
   }
 
-  await app.listen(process.env.PORT ?? 3000);
+  if (emailDomainConfiguration().allowLocalTestEmails) {
+    await app.listen(process.env.PORT ?? 3000, '127.0.0.1');
+  } else {
+    await app.listen(process.env.PORT ?? 3000);
+  }
 }
 
 void bootstrap();

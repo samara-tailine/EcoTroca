@@ -1,14 +1,16 @@
-import type { AuthSession, LoginResponse, SessionUser } from './auth.types';
+import type { AuthSession, LoginResponse, SessionUser } from "./auth.types";
 
-const STORAGE_KEY = 'ecotroca.session';
+const STORAGE_KEY = "ecotroca.session";
 const listeners = new Set<() => void>();
 
 function tokenExpiresAt(token: string): number | null {
   try {
     // Apenas lê a validade para a interface. A assinatura e as permissões são
     // sempre verificadas pelo backend; perfis não são extraídos do JWT.
-    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-    return typeof payload.exp === 'number' && Number.isFinite(payload.exp)
+    const payload = JSON.parse(
+      atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")),
+    );
+    return typeof payload.exp === "number" && Number.isFinite(payload.exp)
       ? payload.exp * 1000
       : null;
   } catch {
@@ -17,12 +19,20 @@ function tokenExpiresAt(token: string): number | null {
 }
 
 function isUser(value: unknown): value is SessionUser {
-  if (!value || typeof value !== 'object') return false;
+  if (!value || typeof value !== "object") return false;
   const user = value as Partial<SessionUser>;
-  return typeof user.id === 'string' && typeof user.name === 'string' &&
-    typeof user.email === 'string' && Array.isArray(user.accessProfiles) &&
-    user.accessProfiles.every((profile) => profile &&
-      typeof profile.key === 'string' && typeof profile.name === 'string');
+  return (
+    typeof user.id === "string" &&
+    typeof user.name === "string" &&
+    typeof user.email === "string" &&
+    Array.isArray(user.accessProfiles) &&
+    user.accessProfiles.every(
+      (profile) =>
+        profile &&
+        typeof profile.key === "string" &&
+        typeof profile.name === "string",
+    )
+  );
 }
 
 function cleanUser(user: SessionUser): SessionUser {
@@ -39,8 +49,15 @@ function restoreSession(): { session: AuthSession | null; expired: boolean } {
     const saved = sessionStorage.getItem(STORAGE_KEY);
     if (!saved) return { session: null, expired: false };
     const parsed = JSON.parse(saved) as Partial<AuthSession>;
-    const jwtExpiry = typeof parsed.accessToken === 'string' ? tokenExpiresAt(parsed.accessToken) : null;
-    if (!jwtExpiry || !Number.isFinite(parsed.expiresAt) || !isUser(parsed.user)) {
+    const jwtExpiry =
+      typeof parsed.accessToken === "string"
+        ? tokenExpiresAt(parsed.accessToken)
+        : null;
+    if (
+      !jwtExpiry ||
+      !Number.isFinite(parsed.expiresAt) ||
+      !isUser(parsed.user)
+    ) {
       sessionStorage.removeItem(STORAGE_KEY);
       return { session: null, expired: false };
     }
@@ -50,11 +67,19 @@ function restoreSession(): { session: AuthSession | null; expired: boolean } {
       return { session: null, expired: true };
     }
     return {
-      session: { accessToken: parsed.accessToken!, expiresAt, user: cleanUser(parsed.user) },
+      session: {
+        accessToken: parsed.accessToken!,
+        expiresAt,
+        user: cleanUser(parsed.user),
+      },
       expired: false,
     };
   } catch {
-    try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* armazenamento indisponível */ }
+    try {
+      sessionStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* armazenamento indisponível */
+    }
     return { session: null, expired: false };
   }
 }
@@ -67,7 +92,9 @@ export function getSessionSnapshot() {
 
 export function subscribeSession(listener: () => void) {
   listeners.add(listener);
-  return () => { listeners.delete(listener); };
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 function publish(session: AuthSession | null, expired: boolean) {
@@ -83,17 +110,53 @@ function publish(session: AuthSession | null, expired: boolean) {
 
 export function startSession(response: LoginResponse) {
   const jwtExpiry = tokenExpiresAt(response.accessToken);
-  if (!jwtExpiry || !Number.isFinite(response.expiresIn) || response.expiresIn <= 0 ||
-    response.tokenType !== 'Bearer' || !isUser(response.user)) {
-    throw new Error('Não foi possível iniciar a sessão. Tente entrar novamente.');
+  if (
+    !jwtExpiry ||
+    !Number.isFinite(response.expiresIn) ||
+    response.expiresIn <= 0 ||
+    response.tokenType !== "Bearer" ||
+    !isUser(response.user)
+  ) {
+    throw new Error(
+      "Não foi possível iniciar a sessão. Tente entrar novamente.",
+    );
   }
   const expiresAt = Math.min(jwtExpiry, Date.now() + response.expiresIn * 1000);
   if (expiresAt <= Date.now()) {
-    throw new Error('A sessão recebida expirou. Tente entrar novamente.');
+    throw new Error("A sessão recebida expirou. Tente entrar novamente.");
   }
-  publish({ accessToken: response.accessToken, expiresAt, user: cleanUser(response.user) }, false);
+  publish(
+    {
+      accessToken: response.accessToken,
+      expiresAt,
+      user: cleanUser(response.user),
+    },
+    false,
+  );
 }
 
 export function endSession(expired = false) {
   publish(null, expired);
+}
+/** Atualiza somente os dados públicos da própria conta, sem renovar o JWT ou sua validade. */
+export function synchronizeSessionUser(
+  user: SessionUser & { isActive?: boolean },
+  expectedToken?: string,
+): boolean {
+  const current = snapshot.session;
+  if (
+    !current ||
+    (expectedToken !== undefined && current.accessToken !== expectedToken) ||
+    !isUser(user) ||
+    user.id !== current.user.id
+  )
+    return false;
+  if (user.isActive === false || current.expiresAt <= Date.now()) {
+    endSession(true);
+    return false;
+  }
+  const cleaned = cleanUser(user);
+  if (JSON.stringify(cleaned) !== JSON.stringify(current.user))
+    publish({ ...current, user: cleaned }, false);
+  return true;
 }

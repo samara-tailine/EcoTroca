@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
 import {
   IsEmail,
+  Equals,
   IsString,
   MaxLength,
   MinLength,
@@ -8,6 +9,12 @@ import {
 } from 'class-validator';
 
 export class UpdateUserDto {
+  @Equals(undefined, {
+    message:
+      'Para alterar perfis, utilize a atribuição de perfis do usuário. ADMIN não pode acumular LIBRARY ou XEROX, e LIBRARY não pode acumular XEROX.',
+  })
+  accessProfileKeys?: never;
+
   @ValidateIf((_object, value) => value !== undefined)
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()

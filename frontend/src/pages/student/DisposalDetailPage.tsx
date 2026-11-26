@@ -63,9 +63,17 @@ export function DisposalDetailPage() {
               <strong>{formatDate(request.requestedAt)}</strong>
             </div>
             <div>
-              <span className="field-help">Peso total histórico</span>
+              <span className="field-help">Peso declarado (preservado)</span>
               <strong>{formatGrams(request.totalWeightGramsSnapshot)}</strong>
             </div>
+            {request.totalWeightGramsObserved !== null && (
+              <div>
+                <span className="field-help">
+                  Peso conferido pela Biblioteca
+                </span>
+                <strong>{formatGrams(request.totalWeightGramsObserved)}</strong>
+              </div>
+            )}
             <button
               type="button"
               className="secondary-button"

@@ -1,6 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   ArrayUnique,
   IsArray,
   IsIn,
@@ -65,7 +66,32 @@ export class DisposalDivergenceDto {
   functionalityObserved?: Functionality;
 }
 
+export class CheckedDisposalItemDto {
+  @IsUUID(undefined, {
+    message: 'O identificador do item conferido deve ser um UUID válido.',
+  })
+  itemId!: string;
+  @IsInt({ message: 'A quantidade conferida deve ser um número inteiro.' })
+  @Min(0, { message: 'A quantidade conferida não pode ser negativa.' })
+  @Max(2147483647, {
+    message: 'A quantidade conferida excede o limite permitido.',
+  })
+  quantityObserved!: number;
+}
 export class CheckDisposalDto extends DisposalNotesDto {
+  @IsArray({ message: 'Informe as quantidades conferidas de todos os itens.' })
+  @ArrayMinSize(1, { message: 'Confira pelo menos um item.' })
+  @ArrayMaxSize(100, { message: 'A conferência aceita até 100 itens.' })
+  @ArrayUnique((item: CheckedDisposalItemDto | null) => item?.itemId, {
+    message: 'Informe cada item conferido apenas uma vez.',
+  })
+  @ValidateNested({
+    each: true,
+    message: 'Cada item conferido deve conter dados válidos.',
+  })
+  @Type(() => CheckedDisposalItemDto)
+  items!: CheckedDisposalItemDto[];
+
   @ValidateIf((_object, value) => value !== undefined)
   @IsArray({ message: 'As divergências devem ser informadas em uma lista.' })
   @ArrayMaxSize(100, {

@@ -1,3 +1,4 @@
+import { calculateObservedWeight } from '../disposals/observed-weight.js';
 import {
   BadRequestException,
   ConflictException,
@@ -25,6 +26,7 @@ const MOVEMENT_INCLUDE = {
     select: {
       id: true,
       totalWeightGramsSnapshot: true,
+      totalWeightGramsObserved: true,
       conversionRateCoinsPerKgSnapshot: true,
       requester: { select: { id: true, name: true } },
     },
@@ -114,13 +116,23 @@ export class EcocoinsService {
       );
     }
     if (
-      !request.totalWeightGramsSnapshot ||
+      !request.totalWeightGramsObserved ||
       !request.conversionRateCoinsPerKgSnapshot?.equals(ECOCOINS_PER_KG)
     ) {
       throw new ConflictException(
         'O peso ou a taxa histórica da aprovação está inconsistente.',
       );
     }
+    const checkedItems = await tx.disposalItem.findMany({
+      where: { disposalRequestId },
+      select: { quantityObserved: true, averageWeightGramsSnapshot: true },
+    });
+    if (
+      calculateObservedWeight(checkedItems) !== request.totalWeightGramsObserved
+    )
+      throw new ConflictException(
+        'O crédito exige conferência completa e peso conferido consistente.',
+      );
     const previous = await tx.ecoCoinMovement.findUnique({
       where: { disposalRequestId },
     });
@@ -143,7 +155,7 @@ export class EcocoinsService {
       );
 
     // Gramas inteiras a 10 moedas/kg resultam em centésimos exatos, sem ponto flutuante.
-    const amount = new Prisma.Decimal(request.totalWeightGramsSnapshot)
+    const amount = new Prisma.Decimal(request.totalWeightGramsObserved)
       .mul(ECOCOINS_PER_KG)
       .div(1000);
     if (!amount.isPositive() || amount.decimalPlaces() > 2)
@@ -250,7 +262,10 @@ export class EcocoinsService {
               ? 'Descarte aprovado'
               : 'Movimentação anterior',
         disposalRequestId: movement.disposalRequestId,
-        weightGrams: movement.disposalRequest?.totalWeightGramsSnapshot ?? null,
+        weightGrams:
+          movement.disposalRequest?.totalWeightGramsObserved ??
+          movement.disposalRequest?.totalWeightGramsSnapshot ??
+          null,
         coinsPerKg:
           movement.disposalRequest?.conversionRateCoinsPerKgSnapshot?.toFixed(
             2,

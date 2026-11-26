@@ -1,3 +1,5 @@
+import { GoogleAccountLink } from "../components/GoogleAccountLink";
+import { EcoBanner } from "../components/EcoBanner";
 import { canUseXerox } from "../auth/xeroxPermission";
 import { canUseLibrary } from "../auth/libraryPermission";
 import { profileLabel } from "../auth/profileLabels";
@@ -19,6 +21,7 @@ export function HomePage() {
         </button>
       </header>
       <main className="home-content">
+        <EcoBanner />
         <p className="eyebrow">SUA CONTA ECOTROCA</p>
         <h1>Olá, {user.name}.</h1>
         <p className="home-intro">
@@ -84,6 +87,7 @@ export function HomePage() {
             Abrir painel da Xerox
           </Link>
         )}
+        <GoogleAccountLink />
         <p className="home-note">Pequenas trocas. Novos começos.</p>
       </main>
       <footer className="page-footer">

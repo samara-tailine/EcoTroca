@@ -1,10 +1,11 @@
 import 'dotenv/config';
+import { assertInstitutionalEmail, INSTITUTIONAL_EMAIL_MESSAGE } from '../dist/auth/email-domain.policy.js';
 import { emitKeypressEvents } from 'node:readline';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as argon2 from 'argon2';
 import { PrismaClient } from '../dist/generated/prisma/client.js';
 
-const email = 'admin@ecotroca.test';
+const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
 
 class AdministrativeError extends Error {}
 
@@ -71,6 +72,8 @@ let password = '';
 let confirmation = '';
 
 try {
+  if (!email) throw new AdministrativeError('Configure ADMIN_EMAIL com o e-mail institucional do administrador.');
+  assertInstitutionalEmail(email);
   if (!process.env.DATABASE_URL) {
     throw new AdministrativeError('DATABASE_URL não está configurada.');
   }
@@ -91,7 +94,7 @@ try {
   });
 
   if (!user) {
-    throw new AdministrativeError('A conta admin@ecotroca.test não existe.');
+    throw new AdministrativeError('A conta configurada em ADMIN_EMAIL não existe.');
   }
   if (user.accessProfiles.length === 0) {
     throw new AdministrativeError('A conta não possui perfil ADMIN; nenhuma senha foi alterada.');
@@ -128,10 +131,10 @@ try {
   if (updated !== 1) {
     throw new AdministrativeError('A conta não existe mais ou perdeu o perfil ADMIN; nenhuma senha foi alterada.');
   }
-  process.stdout.write('Senha de admin@ecotroca.test redefinida com hash Argon2id.\n');
+  process.stdout.write('Senha da conta ADMIN_EMAIL redefinida com hash Argon2id.\n');
 } catch (error) {
   process.stderr.write(
-    `${error instanceof AdministrativeError ? error.message : 'Não foi possível redefinir a senha. Verifique a configuração local do banco e o cliente Prisma compilado.'}\n`,
+    `${error instanceof AdministrativeError || error?.message === INSTITUTIONAL_EMAIL_MESSAGE ? error.message : 'Não foi possível redefinir a senha. Verifique a configuração local do banco e o cliente Prisma compilado.'}\n`,
   );
   process.exitCode = 1;
 } finally {

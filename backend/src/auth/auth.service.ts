@@ -1,3 +1,5 @@
+import { assertInstitutionalEmail } from './email-domain.policy.js';
+import type { AuthenticatedUser } from './auth.types.js';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -16,12 +18,28 @@ export class AuthService {
     private readonly usersService: UsersService,
   ) {}
 
+  async currentUser(actor: AuthenticatedUser) {
+    const user = await this.usersService.findOne(actor.id);
+    if (!user.isActive)
+      throw new UnauthorizedException('Conta inválida ou inativa.');
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      isActive: user.isActive,
+      accessProfiles: user.accessProfiles.filter((profile) =>
+        actor.roles.includes(profile.key as AuthenticatedUser['roles'][number]),
+      ),
+    };
+  }
+
   async register(dto: RegisterUserDto) {
     return this.usersService.registerPublic(dto);
   }
 
   async login(dto: LoginDto) {
     const email = dto.email.trim().toLowerCase();
+    assertInstitutionalEmail(email, true);
     const user = await this.prisma.user.findUnique({
       where: { email },
       select: {
@@ -47,6 +65,17 @@ export class AuthService {
       throw new UnauthorizedException('E-mail ou senha inválidos.');
     }
 
+    return this.createSession(user.id);
+  }
+
+  async createSession(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, isActive: true },
+    });
+    if (!user?.isActive)
+      throw new UnauthorizedException('Conta inválida ou inativa.');
+    assertInstitutionalEmail(user.email, true);
     const secret = this.config.getOrThrow<string>('JWT_SECRET');
     if (secret.length < 32) {
       throw new Error('JWT_SECRET deve conter pelo menos 32 caracteres.');

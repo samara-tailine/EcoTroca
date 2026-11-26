@@ -1,7 +1,9 @@
+import { calculateObservedWeight } from './observed-weight.js';
 import { EcocoinsService } from '../ecocoins/ecocoins.service.js';
 import { ECOCOINS_PER_KG } from '../ecocoins/ecocoin.constants.js';
 import {
   CheckDisposalDto,
+  CheckedDisposalItemDto,
   DisposalDivergenceDto,
 } from './dto/check-disposal.dto.js';
 import {
@@ -189,6 +191,7 @@ export class DisposalsService {
       'check',
       dto.notes,
       dto.divergences ?? [],
+      dto.items ?? [],
     );
   }
 
@@ -206,6 +209,7 @@ export class DisposalsService {
     action: Action,
     notes?: string,
     divergences: DisposalDivergenceDto[] = [],
+    observations: CheckedDisposalItemDto[] = [],
   ) {
     this.requireLibrary(actor);
     try {
@@ -218,7 +222,11 @@ export class DisposalsService {
         if (!current)
           throw new NotFoundException('Solicitação não encontrada.');
         const rule = TRANSITIONS[action];
-        if (!rule.from.includes(current.status)) {
+        const completingLegacyCheck =
+          action === 'check' &&
+          current.status === 'IN_REVIEW' &&
+          current.items.some((item) => item.quantityObserved === null);
+        if (!rule.from.includes(current.status) && !completingLegacyCheck) {
           throw new ConflictException(
             'Esta operação não é permitida no status atual da solicitação.',
           );
@@ -239,12 +247,49 @@ export class DisposalsService {
               'A aprovação exige recebimento e conferência registrados.',
             );
           }
+          const observed = calculateObservedWeight(current.items);
+          if (observed <= 0)
+            throw new BadRequestException(
+              'Não há equipamentos confirmados para aprovar. Rejeite a solicitação com justificativa.',
+            );
+          if (current.totalWeightGramsObserved !== observed)
+            throw new ConflictException(
+              'O peso conferido está inconsistente. Complete a conferência antes de aprovar.',
+            );
           const total = this.calculateTotalWeight(current.items);
           if (current.totalWeightGramsSnapshot !== total) {
             throw new ConflictException(
               'O peso histórico da solicitação está inconsistente e precisa ser revisado.',
             );
           }
+        }
+        let observedTotal: number | undefined;
+        const byObserved = new Map(
+          observations.map((item) => [item.itemId, item.quantityObserved]),
+        );
+        if (action === 'check') {
+          if (
+            observations.length !== current.items.length ||
+            byObserved.size !== observations.length ||
+            observations.some(
+              (item) =>
+                !current.items.some((original) => original.id === item.itemId),
+            )
+          )
+            throw new BadRequestException(
+              'Informe a quantidade conferida de cada item desta solicitação, sem omissões ou repetições.',
+            );
+          observedTotal = calculateObservedWeight(
+            current.items.map((item) => ({
+              quantityObserved: byObserved.get(item.id) ?? null,
+              averageWeightGramsSnapshot: item.averageWeightGramsSnapshot,
+            })),
+          );
+          for (const item of current.items)
+            await tx.disposalItem.update({
+              where: { id: item.id },
+              data: { quantityObserved: byObserved.get(item.id)! },
+            });
         }
         const now = new Date();
         if (action === 'check' && divergences.length) {
@@ -269,6 +314,9 @@ export class DisposalsService {
                 (!Number.isInteger(divergence.quantityObserved) ||
                   divergence.quantityObserved < 0 ||
                   divergence.quantityObserved > 2147483647)) ||
+              (divergence.quantityObserved !== undefined &&
+                divergence.quantityObserved !==
+                  byObserved.get(divergence.itemId)) ||
               (divergence.physicalConditionObserved !== undefined &&
                 !PHYSICAL_CONDITIONS.includes(
                   divergence.physicalConditionObserved,
@@ -286,7 +334,7 @@ export class DisposalsService {
               disposalItemId: divergence.itemId,
               recordedById: actor.id,
               description: divergence.description.trim(),
-              quantityObserved: divergence.quantityObserved,
+              quantityObserved: byObserved.get(divergence.itemId),
               physicalConditionObserved: divergence.physicalConditionObserved,
               functionalityObserved: divergence.functionalityObserved,
               createdAt: now,
@@ -299,7 +347,9 @@ export class DisposalsService {
           data: {
             status: rule.to,
             ...(action === 'receive' ? { receivedAt: now } : {}),
-            ...(action === 'check' ? { checkedAt: now } : {}),
+            ...(action === 'check'
+              ? { checkedAt: now, totalWeightGramsObserved: observedTotal }
+              : {}),
             ...(action === 'approve'
               ? {
                   approvedAt: now,
