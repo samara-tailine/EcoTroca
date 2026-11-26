@@ -2,6 +2,81 @@
 
 Projeto acadêmico de incentivo ao descarte responsável de equipamentos eletrônicos. Estudantes solicitam descartes, a Biblioteca recebe e confere os itens e a aprovação gera EcoCoins. O estudante pode enviar EcoCoins à Xerox, que consulta pagamentos e comprovantes. Não há integração bancária ou movimentação de reais.
 
+
+## Avaliação acadêmica: instalação vazia com quatro contas de demonstração
+
+Este é o roteiro recomendado ao professor. As contas de demonstração **não vêm do banco original**: são criadas pelo seed no banco local novo. Não é necessário Google, backup de banco, senha real ou provisionamento institucional para essa avaliação. Node.js, PostgreSQL e acesso ao npm continuam necessários.
+
+1. Instale os pré-requisitos e extraia o ZIP em C:\EcoTroca (ou ajuste os caminhos abaixo).
+2. Crie o papel ecotroca_app e o banco vazio ecotroca_db em UTF8 conforme a seção PostgreSQL deste README. Configure uma senha local própria pelo comando \password do psql.
+3. Instale e configure o backend no PowerShell:
+
+~~~powershell
+Set-Location C:\EcoTroca\backend
+npm.cmd ci
+Copy-Item .env.example .env
+notepad .env
+~~~
+
+Em backend/.env, configure DATABASE_URL com as credenciais do seu banco local e JWT_SECRET com um valor aleatório próprio de pelo menos 32 caracteres. Para gerá-lo: node -e "process.stdout.write(require('node:crypto').randomBytes(48).toString('base64url'))". Mantenha os domínios institucionais e use:
+
+~~~dotenv
+NODE_ENV=development
+ALLOW_LOCAL_TEST_EMAILS=true
+FRONTEND_ORIGIN=http://localhost:5173
+PORT=3000
+ALLOWED_EMAIL_DOMAINS=alunos.ifsuldeminas.edu.br,ifsuldeminas.edu.br
+GOOGLE_CLIENT_ID=
+~~~
+
+O host da DATABASE_URL deve ser localhost, 127.0.0.1 ou ::1. O .env.example mantém a exceção false: habilitação é uma decisão explícita apenas no .env local. Nenhum .env real acompanha o ZIP.
+
+4. Aplique migrações, compile e execute o seed **antes de iniciar a API**:
+
+~~~powershell
+npx.cmd prisma validate --config prisma7.config.ts
+npx.cmd prisma generate --config prisma7.config.ts
+npx.cmd prisma migrate deploy --config prisma7.config.ts
+npm.cmd run build
+node scripts/seed-demo.mjs
+npm.cmd run start:prod
+~~~
+
+start:prod é o nome do comando de execução compilada; NODE_ENV permanece development neste roteiro local. A API fica restrita a 127.0.0.1 com a exceção habilitada. Alternativamente, após o seed use npm.cmd run start:dev. A saúde pública responde em http://localhost:3000/api/health.
+
+O seed cria os quatro perfis ausentes, quatro contas, categorias e oito equipamentos oficiais. Cria somente o que falta; não redefine senhas, nomes, atividade, perfis ou dados existentes. Mouse existente é preservado, mas não é criado automaticamente. A carteira STUDENT inicia zerada pelo trigger; nenhum saldo/crédito fictício, descarte ou pagamento é inserido. Execute novamente para conferir idempotência.
+
+5. Em outro terminal, instale e inicie o frontend:
+
+~~~powershell
+Set-Location C:\EcoTroca\frontend
+npm.cmd ci
+Copy-Item .env.example .env
+npm.cmd run build
+npm.cmd run dev
+~~~
+
+Abra http://localhost:5173. O frontend usa VITE_API_URL=/api e o proxy para localhost:3000. Não há npm install global necessário. Para acesso de outro perfil, saia da sessão atual ou use uma janela anônima.
+
+### Credenciais públicas e exclusivas da demonstração
+
+| E-mail fictício | Perfil | Senha pública de demonstração |
+| --- | --- | --- |
+| admin@ecotroca.test | ADMIN | EcoTrocaDemo!Admin2026 |
+| biblioteca.teste@ecotroca.test | LIBRARY | EcoTrocaDemo!Biblioteca2026 |
+| xerox.teste@ecotroca.test | XEROX | EcoTrocaDemo!Xerox2026 |
+| estudante.teste@ecotroca.test | STUDENT | EcoTrocaDemo!Estudante2026 |
+
+**Estas senhas são intencionalmente públicas, fictícias e diferentes por conta. Não reutilize em produção, contas institucionais, serviços pessoais ou instalação exposta na rede.** Somente o hash Argon2id é armazenado no banco. A API e o seed bloqueiam ecotroca.test em produção mesmo que a flag esteja true. Gmail continua bloqueado também em desenvolvimento; os dois domínios institucionais continuam permitidos.
+
+Se uma conta já existia antes do seed, sua senha/perfil/situação permanece intacta; não suponha que a senha pública acima substituiu uma senha existente. Para reproduzir exatamente a demonstração, use banco vazio separado, sem apagar o banco original. Não use migrate reset ou db push.
+
+### Conferência da avaliação
+
+STUDENT solicita um descarte; LIBRARY recebe, informa todas as quantidades conferidas e aprova; STUDENT recebe 10 EcoCoins/kg e confirma pagamento à Xerox; XEROX consulta o recebimento. ADMIN gerencia usuários e catálogo, sem executar operações da Biblioteca/Xerox. Os pesos permanecem fixos. Rejeição exige justificativa; autoaprovação e duplicação de créditos/pagamentos são bloqueadas.
+
+O roteiro institucional mais abaixo continua válido para uso sem demonstração: deixe ALLOW_LOCAL_TEST_EMAILS=false, configure ADMIN_EMAIL institucional e use provision-admin.mjs. **Não execute os dois provisionamentos para o mesmo e-mail.** Para o roteiro de demonstração, seed-demo.mjs já prepara tudo e dispensa provision-admin.mjs e seed-equipment.mjs separados.
+
 ## Tecnologias e arquitetura
 
 - Backend: NestJS, TypeScript, Passport/JWT, Argon2id, Prisma ORM 7 e PostgreSQL.

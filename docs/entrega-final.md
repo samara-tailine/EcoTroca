@@ -1,32 +1,42 @@
-# Entrega final atualizada — 26/11/2026
+# Entrega acadêmica autossuficiente — 26/11/2026
 
-## Alteração final
+## Roteiro do professor
 
-Acesso restrito a e-mails institucionais exatos, configurável por ALLOWED_EMAIL_DOMAINS. Aplicado no cadastro/login tradicional, Google/vínculo, cadastro técnico, alteração de e-mail e sessões existentes. Mensagem e feedback em pt-BR; sem mudança de design. Detalhes e arquivos de política em [acesso-institucional.md](acesso-institucional.md).
+O README principal inicia com o roteiro de avaliação: instalar Node/PostgreSQL, criar banco UTF8 vazio e usuário local, npm.cmd ci em backend/frontend, copiar os exemplos para .env locais e configurar DATABASE_URL/JWT_SECRET próprios. Habilitar explicitamente NODE_ENV=development e ALLOW_LOCAL_TEST_EMAILS=true, com banco/frontend loopback. Aplicar as 12 migrações, gerar Prisma, compilar e executar node scripts/seed-demo.mjs antes de iniciar a API. Abrir o frontend e usar as quatro credenciais fictícias publicadas no README.
 
-Exceção ecotroca.test desabilitada por padrão, exclusiva de desenvolvimento com banco/frontend locais; produção nunca a aceita. ADMIN_EMAIL define o endereço institucional dos scripts administrativos. O ambiente real não foi modificado; usuários e históricos não foram migrados ou apagados. Não há nova migração: as 12 existentes continuam necessárias.
+O ZIP dispensa o banco original, Google, senhas pessoais ou dumps. npm ci exige acesso ao registro npm e Node/PostgreSQL devem estar instalados. O seed não roda automaticamente na inicialização. Em produção, não execute o roteiro acadêmico: mantenha exceção false e provisione ADMIN institucional com ADMIN_EMAIL, conforme seção específica do README.
 
-## Instalação limpa e resultados
+## Alterações desta etapa
 
-- Nova cópia sem node_modules, dist, .env ou Prisma Client; npm.cmd ci nos dois projetos com lockfiles inalterados, sem atualização forçada.
-- Novo banco ecotroca_institutional_test em cluster PostgreSQL temporário porta 55436, separado do banco original. Aplicação das 12 migrações do zero aprovada; validação/geração Prisma e carga idempotente dos oito equipamentos aprovadas.
-- Builds backend e frontend aprovados; frontend com 220 módulos.
-- 170 asserções de regressão HTTP e banco: provisionamento institucional ADMIN idempotente sem redefinição, quatro perfis, cadastro público somente STUDENT, pesos bloqueados na API e PostgreSQL, quantidades conferidas 10/7/12 para declaração 10 gerando 100/70/120 EcoCoins, aprovação incompleta/duplicada bloqueada, isolamento de solicitações e créditos, pagamento de 1,25 EcoCoin concorrente com mesma chave gerando um único débito e R$ 0,125, recebimentos Xerox sem expor saldo, inativação e rota de débito antiga indisponível.
-- 125 asserções institucionais/Google/frontend aprovadas, incluindo bloqueio de sessões antigas e demonstração em produção. Total: 295 asserções.
-- Nenhum teste modificou o banco original. Instância temporária desligada após a validação. Também foi verificada a inicialização da API restrita a 127.0.0.1 quando a exceção local está habilitada.
+- Novo backend/scripts/seed-demo.mjs: quatro perfis e contas de demonstração, categorias e oito equipamentos oficiais. Guarda de ambiente antes da conexão; transação única e trava consultiva contra execuções simultâneas.
+- Senhas públicas distintas, fictícias e exclusivas de demonstração no README; Argon2id no banco. Contas/equipamentos/categorias/perfis existentes nunca são sobrescritos pelo seed. Registros ambíguos/pesos incompatíveis interrompem a transação. Carteira STUDENT é criada pelo trigger, sem saldo fictício.
+- README e documentos de backend/acesso institucional atualizados. Design, regras financeiras, permissões, restrição institucional e dependências não foram alterados. Nenhuma migração nova foi necessária. Sem push ou publicação.
+
+## Instalação limpa validada
+
+- Nova cópia sem ambientes reais, node_modules, dist ou cliente Prisma gerado; npm.cmd ci nos dois projetos com lockfiles inalterados.
+- PostgreSQL temporário UTF8 em 127.0.0.1:55436, banco ecotroca_demo_delivery_test inicialmente vazio. Nenhum comando de seed/migração/teste escreveu no banco original.
+- Prisma validate/generate aprovados, 12 migrações aplicadas do zero; builds backend e frontend aprovados (220 módulos no frontend).
+- Seed executado antes de iniciar a API: quatro contas com perfis ADMIN/LIBRARY/XEROX/STUDENT exclusivos, oito equipamentos, categorias e uma carteira STUDENT zerada; sem movimentações ou descartes fictícios.
+- Segunda execução produziu snapshot idêntico dos dados: usuários, hashes/senhas, perfis, associações, categorias, equipamentos e carteira preservados. Repetição após descarte/crédito/pagamento também preservou integralmente saldos e históricos.
+- 123 verificações de API/seed/banco aprovadas e 8 verificações de navegador aprovadas. Os quatro e-mails/senhas exatos do README autenticaram na API e no frontend real, com redirecionamento para o painel correspondente e confirmação de permissões.
+- Testes positivos/negativos dos quatro perfis: ADMIN gerencia usuários/catalogo mas não processa descartes; LIBRARY recebe/confere/aprova e consulta créditos mas não gerencia usuários nem recebe pagamentos; XEROX consulta recebimentos sem carteira de terceiros; STUDENT consulta apenas sua área e não acessa gestão técnica.
+- Fluxo real no banco isolado: estudante declarou duas unidades de notebook de 1 kg; Biblioteca conferiu uma, aprovou e creditou 10,00 EcoCoins. Pagamento simultâneo de 1,25 EcoCoin com mesma chave retornou um só comprovante/débito, equivalente exato R$ 0,125; Xerox consultou um recebimento. Aprovação repetida bloqueada.
+- Cadastro/login com Gmail, Hotmail e domínio fraudulento recusados. Cadastro/login institucional permitido, incluindo caixa diferente. Produção recusa ecotroca.test mesmo com flag true; seed também recusa produção, flag ausente/false e banco/frontend não locais, sem alterar dados.
+- API e frontend temporários foram iniciados em portas isoladas (33029 e 41729); frontend de teste apontou à API isolada por VITE_API_URL público. No roteiro padrão, Vite usa /api e proxy para localhost:3000. A instância PostgreSQL de testes foi desligada após o ensaio.
 
 ## Segurança e pacote
 
-Varredura heurística de 237 versões textuais acessíveis no histórico local sem correspondências para segredos locais atuais, .env real histórico, chave privada ou padrões reconhecíveis de tokens. Não certifica referências remotas/inacessíveis, reflogs ou todos os formatos possíveis. Nenhum valor sensível foi exibido.
+As quatro senhas de demonstração são públicas por decisão explícita desta entrega, não são credenciais reais e jamais devem ser reutilizadas em produção. Não há .env real, JWT_SECRET real, conexão real, dados pessoais ou backup de banco no ZIP. Google é opcional e não exige Client Secret. Hashes do conteúdo foram conferidos após compactação.
 
-ZIP montado pelos arquivos atuais, incluindo arquivos novos não versionados (lista em arquivos-nao-versionados.txt), sem depender de git archive HEAD. Conteúdo conferido por SHA-256. Não inclui .env reais, .git, node_modules, dist, caches, logs, backups, dumps, chaves ou configurações pessoais. Sem commit, push ou publicação. O ZIP anterior só foi substituído após a validação do novo pacote.
+Varredura heurística de 320 versões textuais acessíveis no histórico Git não encontrou os segredos locais pesquisados, .env reais históricos ou padrões reconhecíveis de chaves/tokens. Não é certificação de referências remotas/inacessíveis ou de todo formato possível de segredo. Arquivos novos do pacote estão relacionados em arquivos-nao-versionados.txt; montagem usa o estado atual, sem depender de git archive HEAD.
 
-## Limitações e providências
+O ZIP anterior só foi substituído após os testes e conferência do novo conteúdo. Excluídos .env reais, node_modules, dist, .git, caches, logs, dumps, backups, chaves e configurações pessoais. Nenhum dado da instância temporária integra a entrega.
 
-O ambiente original possui somente contas externas/teste na consulta desta preparação (quatro ecotroca.test e três gmail.com). Elas permanecem intactas. Após reiniciar com a nova versão, defaults bloqueiam todas: configure um ADMIN institucional novo ou, somente para demonstração local, habilite explicitamente a exceção ecotroca.test conforme README. gmail.com continua bloqueado. Nenhuma credencial institucional real foi solicitada ou inventada.
+## Limitações
 
-Google foi validado com assinatura RSA real e chaves públicas temporárias simuladas; login com conta Google real depende de Client ID, origens, público, políticas Workspace e endereço institucional. Não houve novo ensaio visual de navegador dos quatro painéis.
+Senhas/perfis do README são garantidos para contas criadas pelo seed em banco vazio. Se o e-mail já existir, o seed o preserva e avisa; não redefine senha nem ativa/promove a conta. O seed não cria Mouse automaticamente, preserva o existente e não insere créditos iniciais. É necessário executar o fluxo Biblioteca para obter EcoCoins.
 
-Alertas npm conhecidos permanecem sem atualização: instalação anterior reportou backend 18 (2 baixos, 11 moderados, 5 altos) e frontend 9 moderados incluindo desenvolvimento; auditoria de produção anterior encontrou zero no frontend e três altos na cadeia Prisma/config/effect. Nesta reinstalação usou-se --no-audit para evitar consultas repetidas; lockfiles não mudaram. Não foi demonstrada exploração pela API. @scarf/scarf continuou sem script de telemetria aprovado, sem impedir a instalação ou o funcionamento.
+Login Google real depende da configuração externa e de conta institucional; não é necessário para avaliar os quatro perfis por senha. Não houve novo teste Google real nesta etapa. Binários nativos/instalação ainda dependem de um Windows/Node compatível e acesso ao npm. Foram mantidos os alertas de dependências conhecidos, sem audit fix ou atualização forçada: na auditoria anterior, três altos da cadeia Prisma/config/effect em produção no backend, zero no frontend; desenvolvimento também possui alertas.
 
-Limites anteriores preservados: sem recuperação de senha, limitação de tentativas, proteção do último ADMIN, upload, estornos ou ajustes manuais. Nomes de categorias têm pré-checagem sem distinção de caixa, mas índice único não normaliza caixa em concorrência. Produção pública requer revisão adicional de segurança/hosting; entrega acadêmica local foi reproduzida em ambiente isolado.
+Não há recuperação pública de senha, limitação de tentativas, proteção do último ADMIN, upload, estorno ou ajustes manuais. O pacote é adequado à avaliação acadêmica local, não representa certificação de publicação em produção.

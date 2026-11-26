@@ -38,3 +38,7 @@ Na consulta de leitura do ambiente original, foram encontradas quatro contas eco
 125 asserções institucionais: domínio exato, caixa, fraude/sufixo/subdomínio, pessoais, cadastro/login/admin/edição, sessões antigas inclusive claim de e-mail forjado, domínio de demonstração local e bloqueio em produção, Google RSA com certificado temporário, audiência/nonce, hd forjado, conta Google vinculada com e-mail externo, vínculo permitido/recusado e consistência da validação de frontend.
 
 170 asserções adicionais de regressão: quatro perfis, pesos fixos, descarte, conferência e crédito, histórico, pagamento simultâneo idempotente e permissões. Tudo em banco temporário separado. Google real ainda depende do Console/conta institucional; o certificado do teste foi simulado, sem substituir verificações no código entregue.
+
+## Seed acadêmico local
+
+Para banco vazio, NODE_ENV=development e ALLOW_LOCAL_TEST_EMAILS=true com banco/frontend locais: após npm.cmd ci, geração Prisma, migrate deploy e build, execute node scripts/seed-demo.mjs antes de iniciar a API. Cria somente perfis/contas/catálogo ausentes, sem sobrescrever existentes. Credenciais públicas fictícias e roteiro completo no README principal; nunca usar em produção. Não exige Google nem o banco original.
